@@ -25,7 +25,10 @@ type AddPlatformIdentityProviderTrust struct {
 	Description *string `json:"description,omitempty"`
 	Domain *string `json:"domain,omitempty"`
 	AliasZid *string `json:"aliasZid,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AddPlatformIdentityProviderTrust AddPlatformIdentityProviderTrust
 
 // NewAddPlatformIdentityProviderTrust instantiates a new AddPlatformIdentityProviderTrust object
 // This constructor will assign default values to properties that have it defined,
@@ -264,7 +267,38 @@ func (o AddPlatformIdentityProviderTrust) ToMap() (map[string]interface{}, error
 	if !IsNil(o.AliasZid) {
 		toSerialize["aliasZid"] = o.AliasZid
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AddPlatformIdentityProviderTrust) UnmarshalJSON(data []byte) (err error) {
+	varAddPlatformIdentityProviderTrust := _AddPlatformIdentityProviderTrust{}
+
+	err = json.Unmarshal(data, &varAddPlatformIdentityProviderTrust)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AddPlatformIdentityProviderTrust(varAddPlatformIdentityProviderTrust)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "fromOriginKey")
+		delete(additionalProperties, "fromIasTenantUrl")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "domain")
+		delete(additionalProperties, "aliasZid")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAddPlatformIdentityProviderTrust struct {

@@ -24,7 +24,10 @@ type ScimMeta struct {
 	Created *time.Time `json:"created,omitempty"`
 	LastModified *time.Time `json:"lastModified,omitempty"`
 	Attributes []string `json:"attributes,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ScimMeta ScimMeta
 
 // NewScimMeta instantiates a new ScimMeta object
 // This constructor will assign default values to properties that have it defined,
@@ -193,7 +196,36 @@ func (o ScimMeta) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Attributes) {
 		toSerialize["attributes"] = o.Attributes
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ScimMeta) UnmarshalJSON(data []byte) (err error) {
+	varScimMeta := _ScimMeta{}
+
+	err = json.Unmarshal(data, &varScimMeta)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ScimMeta(varScimMeta)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "version")
+		delete(additionalProperties, "created")
+		delete(additionalProperties, "lastModified")
+		delete(additionalProperties, "attributes")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableScimMeta struct {

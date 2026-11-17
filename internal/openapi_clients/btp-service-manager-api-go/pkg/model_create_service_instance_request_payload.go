@@ -12,8 +12,8 @@ package openapi
 
 import (
 	"encoding/json"
-	"gopkg.in/validator.v2"
 	"fmt"
+	"gopkg.in/validator.v2"
 )
 
 // CreateServiceInstanceRequestPayload - struct for CreateServiceInstanceRequestPayload
@@ -84,6 +84,10 @@ func (dst *CreateServiceInstanceRequestPayload) UnmarshalJSON(data []byte) error
 	} else if match == 1 {
 		return nil // exactly one match
 	} else { // no match
+		if err != nil {
+			return fmt.Errorf("data failed to match schemas in oneOf(CreateServiceInstanceRequestPayload): %v", err)
+		}
+
 		return fmt.Errorf("data failed to match schemas in oneOf(CreateServiceInstanceRequestPayload)")
 	}
 }
@@ -112,6 +116,20 @@ func (obj *CreateServiceInstanceRequestPayload) GetActualInstance() (interface{}
 
 	if obj.CreateByPlanID != nil {
 		return obj.CreateByPlanID
+	}
+
+	// all schemas are nil
+	return nil
+}
+
+// Get the actual instance value
+func (obj CreateServiceInstanceRequestPayload) GetActualInstanceValue() (interface{}) {
+	if obj.CreateByOfferingAndPlanName != nil {
+		return *obj.CreateByOfferingAndPlanName
+	}
+
+	if obj.CreateByPlanID != nil {
+		return *obj.CreateByPlanID
 	}
 
 	// all schemas are nil

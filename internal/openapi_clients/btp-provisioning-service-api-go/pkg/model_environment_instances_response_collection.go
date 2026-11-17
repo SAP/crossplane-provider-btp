@@ -21,7 +21,10 @@ var _ MappedNullable = &EnvironmentInstancesResponseCollection{}
 type EnvironmentInstancesResponseCollection struct {
 	// List of all the environment instances
 	EnvironmentInstances []EnvironmentInstanceResponseObject `json:"environmentInstances,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EnvironmentInstancesResponseCollection EnvironmentInstancesResponseCollection
 
 // NewEnvironmentInstancesResponseCollection instantiates a new EnvironmentInstancesResponseCollection object
 // This constructor will assign default values to properties that have it defined,
@@ -73,7 +76,7 @@ func (o *EnvironmentInstancesResponseCollection) SetEnvironmentInstances(v []Env
 }
 
 func (o EnvironmentInstancesResponseCollection) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -85,7 +88,33 @@ func (o EnvironmentInstancesResponseCollection) ToMap() (map[string]interface{},
 	if !IsNil(o.EnvironmentInstances) {
 		toSerialize["environmentInstances"] = o.EnvironmentInstances
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EnvironmentInstancesResponseCollection) UnmarshalJSON(data []byte) (err error) {
+	varEnvironmentInstancesResponseCollection := _EnvironmentInstancesResponseCollection{}
+
+	err = json.Unmarshal(data, &varEnvironmentInstancesResponseCollection)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EnvironmentInstancesResponseCollection(varEnvironmentInstancesResponseCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "environmentInstances")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEnvironmentInstancesResponseCollection struct {
@@ -123,5 +152,3 @@ func (v *NullableEnvironmentInstancesResponseCollection) UnmarshalJSON(src []byt
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -23,7 +23,10 @@ type UpdateSubscriptionRequestPayload struct {
 	PlanName *string `json:"planName,omitempty"`
 	// Additional subscription parameters determined by the application provider.
 	SubscriptionParams map[string]map[string]interface{} `json:"subscriptionParams,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UpdateSubscriptionRequestPayload UpdateSubscriptionRequestPayload
 
 // NewUpdateSubscriptionRequestPayload instantiates a new UpdateSubscriptionRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -122,7 +125,34 @@ func (o UpdateSubscriptionRequestPayload) ToMap() (map[string]interface{}, error
 	if !IsNil(o.SubscriptionParams) {
 		toSerialize["subscriptionParams"] = o.SubscriptionParams
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UpdateSubscriptionRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varUpdateSubscriptionRequestPayload := _UpdateSubscriptionRequestPayload{}
+
+	err = json.Unmarshal(data, &varUpdateSubscriptionRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UpdateSubscriptionRequestPayload(varUpdateSubscriptionRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "planName")
+		delete(additionalProperties, "subscriptionParams")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUpdateSubscriptionRequestPayload struct {

@@ -21,7 +21,10 @@ var _ MappedNullable = &DataCenterResponseCollection{}
 type DataCenterResponseCollection struct {
 	// Contains information about the available data centers for a specified global account.
 	Datacenters []DataCenterResponseObject `json:"datacenters,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _DataCenterResponseCollection DataCenterResponseCollection
 
 // NewDataCenterResponseCollection instantiates a new DataCenterResponseCollection object
 // This constructor will assign default values to properties that have it defined,
@@ -85,7 +88,33 @@ func (o DataCenterResponseCollection) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Datacenters) {
 		toSerialize["datacenters"] = o.Datacenters
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *DataCenterResponseCollection) UnmarshalJSON(data []byte) (err error) {
+	varDataCenterResponseCollection := _DataCenterResponseCollection{}
+
+	err = json.Unmarshal(data, &varDataCenterResponseCollection)
+
+	if err != nil {
+		return err
+	}
+
+	*o = DataCenterResponseCollection(varDataCenterResponseCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "datacenters")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableDataCenterResponseCollection struct {

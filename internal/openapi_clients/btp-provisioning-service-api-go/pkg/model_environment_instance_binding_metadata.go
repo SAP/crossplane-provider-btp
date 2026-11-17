@@ -28,8 +28,11 @@ type EnvironmentInstanceBindingMetadata struct {
 	// Expiry date for the binding.
 	ExpiresAt *string `json:"expiresAt,omitempty"`
 	// The environment instance ID associated with the binding.
-	InstanceId *string `json:"instanceId,omitempty"`
+	InstanceId           *string `json:"instanceId,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EnvironmentInstanceBindingMetadata EnvironmentInstanceBindingMetadata
 
 // NewEnvironmentInstanceBindingMetadata instantiates a new EnvironmentInstanceBindingMetadata object
 // This constructor will assign default values to properties that have it defined,
@@ -209,7 +212,7 @@ func (o *EnvironmentInstanceBindingMetadata) SetInstanceId(v string) {
 }
 
 func (o EnvironmentInstanceBindingMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -233,7 +236,37 @@ func (o EnvironmentInstanceBindingMetadata) ToMap() (map[string]interface{}, err
 	if !IsNil(o.InstanceId) {
 		toSerialize["instanceId"] = o.InstanceId
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EnvironmentInstanceBindingMetadata) UnmarshalJSON(data []byte) (err error) {
+	varEnvironmentInstanceBindingMetadata := _EnvironmentInstanceBindingMetadata{}
+
+	err = json.Unmarshal(data, &varEnvironmentInstanceBindingMetadata)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EnvironmentInstanceBindingMetadata(varEnvironmentInstanceBindingMetadata)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "bindingId")
+		delete(additionalProperties, "createdBy")
+		delete(additionalProperties, "createdDate")
+		delete(additionalProperties, "expiresAt")
+		delete(additionalProperties, "instanceId")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEnvironmentInstanceBindingMetadata struct {
@@ -271,5 +304,3 @@ func (v *NullableEnvironmentInstanceBindingMetadata) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

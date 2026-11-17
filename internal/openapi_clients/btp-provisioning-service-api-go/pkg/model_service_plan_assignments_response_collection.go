@@ -19,8 +19,11 @@ var _ MappedNullable = &ServicePlanAssignmentsResponseCollection{}
 
 // ServicePlanAssignmentsResponseCollection struct for ServicePlanAssignmentsResponseCollection
 type ServicePlanAssignmentsResponseCollection struct {
-	Quotas []ServicePlanAssignmentsResponseObject `json:"quotas,omitempty"`
+	Quotas               []ServicePlanAssignmentsResponseObject `json:"quotas,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServicePlanAssignmentsResponseCollection ServicePlanAssignmentsResponseCollection
 
 // NewServicePlanAssignmentsResponseCollection instantiates a new ServicePlanAssignmentsResponseCollection object
 // This constructor will assign default values to properties that have it defined,
@@ -72,7 +75,7 @@ func (o *ServicePlanAssignmentsResponseCollection) SetQuotas(v []ServicePlanAssi
 }
 
 func (o ServicePlanAssignmentsResponseCollection) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -84,7 +87,33 @@ func (o ServicePlanAssignmentsResponseCollection) ToMap() (map[string]interface{
 	if !IsNil(o.Quotas) {
 		toSerialize["quotas"] = o.Quotas
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServicePlanAssignmentsResponseCollection) UnmarshalJSON(data []byte) (err error) {
+	varServicePlanAssignmentsResponseCollection := _ServicePlanAssignmentsResponseCollection{}
+
+	err = json.Unmarshal(data, &varServicePlanAssignmentsResponseCollection)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServicePlanAssignmentsResponseCollection(varServicePlanAssignmentsResponseCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "quotas")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServicePlanAssignmentsResponseCollection struct {
@@ -122,5 +151,3 @@ func (v *NullableServicePlanAssignmentsResponseCollection) UnmarshalJSON(src []b
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

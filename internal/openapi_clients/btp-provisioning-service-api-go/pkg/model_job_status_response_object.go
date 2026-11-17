@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -23,11 +22,12 @@ var _ MappedNullable = &JobStatusResponseObject{}
 type JobStatusResponseObject struct {
 	CustomParams map[string]map[string]interface{} `json:"customParams,omitempty"`
 	// A description of the exit status of a job when it ends.
-	Description string `json:"description"`
-	JobParams *map[string]JobParameter `json:"jobParams,omitempty"`
+	Description string                   `json:"description"`
+	JobParams   *map[string]JobParameter `json:"jobParams,omitempty"`
 	// The current state of the job.  * <b>IN_PROGRESS:</b> The job is being executed. * <b>COMPLETED:</b> The job has completed. * <b>FAILED:</b> The job failed and did not complete. The job can be restarted.
-	Status string `json:"status"`
-	StatusDetails map[string]map[string]interface{} `json:"statusDetails,omitempty"`
+	Status               string                            `json:"status"`
+	StatusDetails        map[string]map[string]interface{} `json:"statusDetails,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _JobStatusResponseObject JobStatusResponseObject
@@ -196,7 +196,7 @@ func (o *JobStatusResponseObject) SetStatusDetails(v map[string]map[string]inter
 }
 
 func (o JobStatusResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -216,6 +216,11 @@ func (o JobStatusResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.StatusDetails) {
 		toSerialize["statusDetails"] = o.StatusDetails
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -233,10 +238,10 @@ func (o *JobStatusResponseObject) UnmarshalJSON(data []byte) (err error) {
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	for _, requiredProperty := range(requiredProperties) {
+	for _, requiredProperty := range requiredProperties {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -244,15 +249,24 @@ func (o *JobStatusResponseObject) UnmarshalJSON(data []byte) (err error) {
 
 	varJobStatusResponseObject := _JobStatusResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varJobStatusResponseObject)
+	err = json.Unmarshal(data, &varJobStatusResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = JobStatusResponseObject(varJobStatusResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "customParams")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "jobParams")
+		delete(additionalProperties, "status")
+		delete(additionalProperties, "statusDetails")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }
@@ -292,5 +306,3 @@ func (v *NullableJobStatusResponseObject) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -368,6 +368,7 @@ func (a *IdentityProvidersAPIService) CreateIdentityProviderExecute(r IdentityPr
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -504,6 +505,7 @@ func (a *IdentityProvidersAPIService) DeleteIdentityProviderExecute(r IdentityPr
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -617,6 +619,7 @@ func (a *IdentityProvidersAPIService) DeleteIdentityProviderUsingOriginKeyExecut
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1103,6 +1106,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderExecute(r Identity
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1251,6 +1255,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderByOriginKeyDepreca
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1367,6 +1372,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderByOriginKeyDepreca
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1483,6 +1489,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderByOriginKeyDepreca
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1599,6 +1606,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderByOriginKeyDepreca
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1715,6 +1723,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderByOriginKeyDepreca
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1831,6 +1840,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderByOriginKeyDepreca
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1947,6 +1957,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProviderByOriginKeyDepreca
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -2067,6 +2078,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProvidersExecute(r Identit
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -2209,6 +2221,7 @@ func (a *IdentityProvidersAPIService) RetrieveIdentityProvidersForBtpCliDeprecat
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -2585,6 +2598,7 @@ func (a *IdentityProvidersAPIService) UpdateIdentityProviderExecute(r IdentityPr
 		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", r.rawConfig, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "rawConfig", defaultValue, "form", "")
 		r.rawConfig = &defaultValue
 	}
 	// to determine the Content-Type header

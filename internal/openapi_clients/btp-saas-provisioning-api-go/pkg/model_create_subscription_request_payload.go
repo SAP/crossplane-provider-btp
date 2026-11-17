@@ -23,7 +23,10 @@ type CreateSubscriptionRequestPayload struct {
 	PlanName *string `json:"planName,omitempty"`
 	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  } 
 	SubscriptionParams map[string]interface{} `json:"subscriptionParams,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _CreateSubscriptionRequestPayload CreateSubscriptionRequestPayload
 
 // NewCreateSubscriptionRequestPayload instantiates a new CreateSubscriptionRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -122,7 +125,34 @@ func (o CreateSubscriptionRequestPayload) ToMap() (map[string]interface{}, error
 	if !IsNil(o.SubscriptionParams) {
 		toSerialize["subscriptionParams"] = o.SubscriptionParams
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *CreateSubscriptionRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varCreateSubscriptionRequestPayload := _CreateSubscriptionRequestPayload{}
+
+	err = json.Unmarshal(data, &varCreateSubscriptionRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = CreateSubscriptionRequestPayload(varCreateSubscriptionRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "planName")
+		delete(additionalProperties, "subscriptionParams")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableCreateSubscriptionRequestPayload struct {

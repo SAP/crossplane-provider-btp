@@ -13,7 +13,6 @@ package openapi
 import (
 	"encoding/json"
 	"time"
-	"bytes"
 	"fmt"
 )
 
@@ -38,6 +37,7 @@ type ListedServiceBrokerResponseObject struct {
 	Ready *bool `json:"ready,omitempty"`
 	// The last time the service broker was updated. <br/>In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _ListedServiceBrokerResponseObject ListedServiceBrokerResponseObject
@@ -331,6 +331,11 @@ func (o ListedServiceBrokerResponseObject) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -359,15 +364,27 @@ func (o *ListedServiceBrokerResponseObject) UnmarshalJSON(data []byte) (err erro
 
 	varListedServiceBrokerResponseObject := _ListedServiceBrokerResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varListedServiceBrokerResponseObject)
+	err = json.Unmarshal(data, &varListedServiceBrokerResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = ListedServiceBrokerResponseObject(varListedServiceBrokerResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "broker_url")
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "updated_at")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

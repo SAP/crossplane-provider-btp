@@ -16,7 +16,7 @@ on:
 jobs:
   test-docs-hub-build-pr:
     if: github.event_name == 'pull_request'
-    uses: SAP/crossplane-provider-docs/.github/workflows/test-submodule-build.yml@e28e43beee90a15991ebc7ddb48f50569729b7cf # main
+    uses: SAP/crossplane-provider-docs/.github/workflows/test-submodule-build.yml@ee2fe6d9ccbaa295d925d030d4b8e2da9e0b067b # main
     with:
       provider-repo: ${{ github.event.pull_request.head.repo.full_name }}
       provider-ref: ${{ github.event.pull_request.head.sha }}
@@ -24,7 +24,7 @@ jobs:
 
   test-docs-hub-build-push:
     if: github.event_name == 'push'
-    uses: SAP/crossplane-provider-docs/.github/workflows/test-submodule-build.yml@e28e43beee90a15991ebc7ddb48f50569729b7cf # main
+    uses: SAP/crossplane-provider-docs/.github/workflows/test-submodule-build.yml@ee2fe6d9ccbaa295d925d030d4b8e2da9e0b067b # main
     with:
       provider-repo: ${{ github.repository }}
       provider-ref: ${{ github.sha }}

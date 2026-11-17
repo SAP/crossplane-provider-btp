@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -22,6 +21,7 @@ var _ MappedNullable = &DirectoryAssignmentsRequestPayloadCollection{}
 // DirectoryAssignmentsRequestPayloadCollection JSON object that contains the specifications of assignment, such as the name of the assigned plan, the quantity to distribute, and whether to distribute the quota and how much to subaccounts that currently exist in the directory and to subaccounts that will added to the directory in the future.
 type DirectoryAssignmentsRequestPayloadCollection struct {
 	Entitlements []DirectoryAssignmentsRequestPayload `json:"entitlements"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _DirectoryAssignmentsRequestPayloadCollection DirectoryAssignmentsRequestPayloadCollection
@@ -79,6 +79,11 @@ func (o DirectoryAssignmentsRequestPayloadCollection) MarshalJSON() ([]byte, err
 func (o DirectoryAssignmentsRequestPayloadCollection) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["entitlements"] = o.Entitlements
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -106,15 +111,20 @@ func (o *DirectoryAssignmentsRequestPayloadCollection) UnmarshalJSON(data []byte
 
 	varDirectoryAssignmentsRequestPayloadCollection := _DirectoryAssignmentsRequestPayloadCollection{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varDirectoryAssignmentsRequestPayloadCollection)
+	err = json.Unmarshal(data, &varDirectoryAssignmentsRequestPayloadCollection)
 
 	if err != nil {
 		return err
 	}
 
 	*o = DirectoryAssignmentsRequestPayloadCollection(varDirectoryAssignmentsRequestPayloadCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "entitlements")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -31,6 +30,7 @@ type Role struct {
 	IsReadOnly *bool `json:"isReadOnly,omitempty"`
 	AppName *string `json:"appName,omitempty"`
 	AppDescription *string `json:"appDescription,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _Role Role
@@ -358,6 +358,11 @@ func (o Role) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AppDescription) {
 		toSerialize["appDescription"] = o.AppDescription
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -390,15 +395,29 @@ func (o *Role) UnmarshalJSON(data []byte) (err error) {
 
 	varRole := _Role{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varRole)
+	err = json.Unmarshal(data, &varRole)
 
 	if err != nil {
 		return err
 	}
 
 	*o = Role(varRole)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "roleTemplateName")
+		delete(additionalProperties, "roleTemplateAppId")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "attributeList")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "scopes")
+		delete(additionalProperties, "roleCollectionReferences")
+		delete(additionalProperties, "isReadOnly")
+		delete(additionalProperties, "appName")
+		delete(additionalProperties, "appDescription")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

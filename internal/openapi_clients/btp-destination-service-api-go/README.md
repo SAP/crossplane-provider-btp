@@ -14,7 +14,7 @@ openapi-generator generate \
   -i swagger-patched.json \
   -g go \
   -o pkg/ \
-  --additional-properties=generateInterfaces=true,disallowAdditionalPropertiesIfNotPresent=false,packageName=openapi
+  --additional-properties=generateInterfaces=true,disallowAdditionalPropertiesIfNotPresent=false,enumUnknownDefaultCase=true,packageName=openapi
 
 # Remove generated files we don't need
 rm -rf pkg/test pkg/go.mod pkg/go.sum pkg/git_push.sh pkg/.travis.yml

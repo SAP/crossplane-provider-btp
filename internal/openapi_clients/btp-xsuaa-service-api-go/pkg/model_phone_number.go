@@ -21,7 +21,10 @@ var _ MappedNullable = &PhoneNumber{}
 type PhoneNumber struct {
 	Value *string `json:"value,omitempty"`
 	Type *string `json:"type,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _PhoneNumber PhoneNumber
 
 // NewPhoneNumber instantiates a new PhoneNumber object
 // This constructor will assign default values to properties that have it defined,
@@ -120,7 +123,34 @@ func (o PhoneNumber) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *PhoneNumber) UnmarshalJSON(data []byte) (err error) {
+	varPhoneNumber := _PhoneNumber{}
+
+	err = json.Unmarshal(data, &varPhoneNumber)
+
+	if err != nil {
+		return err
+	}
+
+	*o = PhoneNumber(varPhoneNumber)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "value")
+		delete(additionalProperties, "type")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullablePhoneNumber struct {

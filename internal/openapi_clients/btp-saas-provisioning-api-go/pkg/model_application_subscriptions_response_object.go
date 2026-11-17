@@ -61,7 +61,10 @@ type ApplicationSubscriptionsResponseObject struct {
 	SubscriptionGUID *string `json:"subscriptionGUID,omitempty"`
 	// Application URL
 	Url *string `json:"url,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ApplicationSubscriptionsResponseObject ApplicationSubscriptionsResponseObject
 
 // NewApplicationSubscriptionsResponseObject instantiates a new ApplicationSubscriptionsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -825,7 +828,53 @@ func (o ApplicationSubscriptionsResponseObject) ToMap() (map[string]interface{},
 	if !IsNil(o.Url) {
 		toSerialize["url"] = o.Url
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ApplicationSubscriptionsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varApplicationSubscriptionsResponseObject := _ApplicationSubscriptionsResponseObject{}
+
+	err = json.Unmarshal(data, &varApplicationSubscriptionsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ApplicationSubscriptionsResponseObject(varApplicationSubscriptionsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "amount")
+		delete(additionalProperties, "appId")
+		delete(additionalProperties, "appName")
+		delete(additionalProperties, "appNameBeforeMovedFromSaasProvisioning")
+		delete(additionalProperties, "changedOn")
+		delete(additionalProperties, "code")
+		delete(additionalProperties, "commercialAppName")
+		delete(additionalProperties, "consumerTenantId")
+		delete(additionalProperties, "createdOn")
+		delete(additionalProperties, "dependencies")
+		delete(additionalProperties, "error")
+		delete(additionalProperties, "globalAccountId")
+		delete(additionalProperties, "isConsumerTenantActive")
+		delete(additionalProperties, "licenseType")
+		delete(additionalProperties, "movedFromSaasProvisioning")
+		delete(additionalProperties, "serviceInstanceId")
+		delete(additionalProperties, "state")
+		delete(additionalProperties, "subaccountId")
+		delete(additionalProperties, "subdomain")
+		delete(additionalProperties, "subscriptionGUID")
+		delete(additionalProperties, "url")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableApplicationSubscriptionsResponseObject struct {

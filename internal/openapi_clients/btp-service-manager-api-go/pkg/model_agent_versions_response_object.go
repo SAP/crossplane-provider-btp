@@ -25,7 +25,10 @@ type AgentVersionsResponseObject struct {
 	CfSap []string `json:"cf-sap,omitempty"`
 	// The list of compatible agent versions for the Kubernetes environment.
 	K8s []string `json:"k8s,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AgentVersionsResponseObject AgentVersionsResponseObject
 
 // NewAgentVersionsResponseObject instantiates a new AgentVersionsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o AgentVersionsResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.K8s) {
 		toSerialize["k8s"] = o.K8s
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AgentVersionsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varAgentVersionsResponseObject := _AgentVersionsResponseObject{}
+
+	err = json.Unmarshal(data, &varAgentVersionsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AgentVersionsResponseObject(varAgentVersionsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "cf")
+		delete(additionalProperties, "cf-sap")
+		delete(additionalProperties, "k8s")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAgentVersionsResponseObject struct {

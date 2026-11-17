@@ -51,7 +51,10 @@ type ServiceOfferingResponseObject struct {
 	Tags []string `json:"tags,omitempty"`
 	// The last time the service offering was updated. <br/> In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServiceOfferingResponseObject ServiceOfferingResponseObject
 
 // NewServiceOfferingResponseObject instantiates a new ServiceOfferingResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -640,7 +643,48 @@ func (o ServiceOfferingResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServiceOfferingResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varServiceOfferingResponseObject := _ServiceOfferingResponseObject{}
+
+	err = json.Unmarshal(data, &varServiceOfferingResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServiceOfferingResponseObject(varServiceOfferingResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "allow_context_updates")
+		delete(additionalProperties, "bindable")
+		delete(additionalProperties, "bindings_retrievable")
+		delete(additionalProperties, "broker_id")
+		delete(additionalProperties, "catalog_id")
+		delete(additionalProperties, "catalog_name")
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "instances_retrievable")
+		delete(additionalProperties, "metadata")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "plan_updateable")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "tags")
+		delete(additionalProperties, "updated_at")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServiceOfferingResponseObject struct {

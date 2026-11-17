@@ -21,3 +21,13 @@
 #docs/*.md
 # Then explicitly reverse the ignore rule for a single file:
 #!docs/README.md
+git_push.sh
+.travis.yml
+.gitignore
+docs/
+test/
+go.mod
+go.sum
+VERSION
+sonar-project.properties
+README.md

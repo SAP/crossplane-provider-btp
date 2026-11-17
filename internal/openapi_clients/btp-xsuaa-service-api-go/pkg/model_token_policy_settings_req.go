@@ -24,7 +24,10 @@ type TokenPolicySettingsReq struct {
 	RefreshTokenUnique *bool `json:"refreshTokenUnique,omitempty"`
 	ChangeMode *string `json:"changeMode,omitempty"`
 	KeyId *string `json:"keyId,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _TokenPolicySettingsReq TokenPolicySettingsReq
 
 // NewTokenPolicySettingsReq instantiates a new TokenPolicySettingsReq object
 // This constructor will assign default values to properties that have it defined,
@@ -228,7 +231,37 @@ func (o TokenPolicySettingsReq) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.KeyId) {
 		toSerialize["keyId"] = o.KeyId
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *TokenPolicySettingsReq) UnmarshalJSON(data []byte) (err error) {
+	varTokenPolicySettingsReq := _TokenPolicySettingsReq{}
+
+	err = json.Unmarshal(data, &varTokenPolicySettingsReq)
+
+	if err != nil {
+		return err
+	}
+
+	*o = TokenPolicySettingsReq(varTokenPolicySettingsReq)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "accessTokenValidity")
+		delete(additionalProperties, "refreshTokenValidity")
+		delete(additionalProperties, "refreshTokenUnique")
+		delete(additionalProperties, "changeMode")
+		delete(additionalProperties, "keyId")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableTokenPolicySettingsReq struct {

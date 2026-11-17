@@ -45,7 +45,10 @@ type XSPlatformIdentityProvider struct {
 	Name *string `json:"name,omitempty"`
 	AliasZid *string `json:"aliasZid,omitempty"`
 	IasTenantUrlWithoutProtocol *string `json:"iasTenantUrlWithoutProtocol,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _XSPlatformIdentityProvider XSPlatformIdentityProvider
 
 // NewXSPlatformIdentityProvider instantiates a new XSPlatformIdentityProvider object
 // This constructor will assign default values to properties that have it defined,
@@ -949,7 +952,57 @@ func (o XSPlatformIdentityProvider) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.IasTenantUrlWithoutProtocol) {
 		toSerialize["iasTenantUrlWithoutProtocol"] = o.IasTenantUrlWithoutProtocol
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *XSPlatformIdentityProvider) UnmarshalJSON(data []byte) (err error) {
+	varXSPlatformIdentityProvider := _XSPlatformIdentityProvider{}
+
+	err = json.Unmarshal(data, &varXSPlatformIdentityProvider)
+
+	if err != nil {
+		return err
+	}
+
+	*o = XSPlatformIdentityProvider(varXSPlatformIdentityProvider)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "originKey")
+		delete(additionalProperties, "iasTenantUrl")
+		delete(additionalProperties, "iasAppId")
+		delete(additionalProperties, "iasAdminUrl")
+		delete(additionalProperties, "active")
+		delete(additionalProperties, "createdByUsername")
+		delete(additionalProperties, "createdByOriginKey")
+		delete(additionalProperties, "createdAt")
+		delete(additionalProperties, "modifiedByUsername")
+		delete(additionalProperties, "modifiedByOriginKey")
+		delete(additionalProperties, "modifiedAt")
+		delete(additionalProperties, "deleted")
+		delete(additionalProperties, "distribution")
+		delete(additionalProperties, "registration")
+		delete(additionalProperties, "result")
+		delete(additionalProperties, "relyingPartyId")
+		delete(additionalProperties, "relyingPartySecret")
+		delete(additionalProperties, "originXsuaa")
+		delete(additionalProperties, "version")
+		delete(additionalProperties, "iasWellKnownMetadata")
+		delete(additionalProperties, "neoAuthnWithOidc")
+		delete(additionalProperties, "domain")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "aliasZid")
+		delete(additionalProperties, "iasTenantUrlWithoutProtocol")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableXSPlatformIdentityProvider struct {

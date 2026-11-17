@@ -47,7 +47,10 @@ type ScimUser struct {
 	LastLogonTime *int64 `json:"lastLogonTime,omitempty"`
 	Password *string `json:"password,omitempty"`
 	Schemas []string `json:"schemas,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ScimUser ScimUser
 
 // NewScimUser instantiates a new ScimUser object
 // This constructor will assign default values to properties that have it defined,
@@ -1021,7 +1024,59 @@ func (o ScimUser) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Schemas) {
 		toSerialize["schemas"] = o.Schemas
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ScimUser) UnmarshalJSON(data []byte) (err error) {
+	varScimUser := _ScimUser{}
+
+	err = json.Unmarshal(data, &varScimUser)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ScimUser(varScimUser)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "externalId")
+		delete(additionalProperties, "meta")
+		delete(additionalProperties, "userName")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "emails")
+		delete(additionalProperties, "groups")
+		delete(additionalProperties, "approvals")
+		delete(additionalProperties, "phoneNumbers")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "nickName")
+		delete(additionalProperties, "profileUrl")
+		delete(additionalProperties, "title")
+		delete(additionalProperties, "userType")
+		delete(additionalProperties, "preferredLanguage")
+		delete(additionalProperties, "locale")
+		delete(additionalProperties, "timezone")
+		delete(additionalProperties, "active")
+		delete(additionalProperties, "verified")
+		delete(additionalProperties, "origin")
+		delete(additionalProperties, "zoneId")
+		delete(additionalProperties, "salt")
+		delete(additionalProperties, "passwordLastModified")
+		delete(additionalProperties, "previousLogonTime")
+		delete(additionalProperties, "lastLogonTime")
+		delete(additionalProperties, "password")
+		delete(additionalProperties, "schemas")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableScimUser struct {

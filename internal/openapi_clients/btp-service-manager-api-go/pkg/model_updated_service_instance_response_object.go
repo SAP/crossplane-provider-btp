@@ -46,7 +46,10 @@ type UpdatedServiceInstanceResponseObject struct {
 	// The last time the service instance was updated. </br> In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 	Usable *bool `json:"usable,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UpdatedServiceInstanceResponseObject UpdatedServiceInstanceResponseObject
 
 // NewUpdatedServiceInstanceResponseObject instantiates a new UpdatedServiceInstanceResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -565,7 +568,46 @@ func (o UpdatedServiceInstanceResponseObject) ToMap() (map[string]interface{}, e
 	if !IsNil(o.Usable) {
 		toSerialize["usable"] = o.Usable
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UpdatedServiceInstanceResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varUpdatedServiceInstanceResponseObject := _UpdatedServiceInstanceResponseObject{}
+
+	err = json.Unmarshal(data, &varUpdatedServiceInstanceResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UpdatedServiceInstanceResponseObject(varUpdatedServiceInstanceResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "context")
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "dashboard_url")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "maintenance_info")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "platform_id")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "referenced_instance_id")
+		delete(additionalProperties, "service_plan_id")
+		delete(additionalProperties, "shared")
+		delete(additionalProperties, "updated_at")
+		delete(additionalProperties, "usable")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUpdatedServiceInstanceResponseObject struct {

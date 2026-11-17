@@ -20,7 +20,10 @@ var _ MappedNullable = &LinksSettings{}
 // LinksSettings struct for LinksSettings
 type LinksSettings struct {
 	HomeRedirect *string `json:"homeRedirect,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _LinksSettings LinksSettings
 
 // NewLinksSettings instantiates a new LinksSettings object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o LinksSettings) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.HomeRedirect) {
 		toSerialize["homeRedirect"] = o.HomeRedirect
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *LinksSettings) UnmarshalJSON(data []byte) (err error) {
+	varLinksSettings := _LinksSettings{}
+
+	err = json.Unmarshal(data, &varLinksSettings)
+
+	if err != nil {
+		return err
+	}
+
+	*o = LinksSettings(varLinksSettings)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "homeRedirect")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableLinksSettings struct {

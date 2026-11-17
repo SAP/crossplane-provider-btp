@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -29,6 +28,7 @@ type RegisterPlatformRequestPayload struct {
 	Name string `json:"name"`
 	// The type of the platform. <br><br> Possible values: 
 	Type string `json:"type"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _RegisterPlatformRequestPayload RegisterPlatformRequestPayload
@@ -182,6 +182,11 @@ func (o RegisterPlatformRequestPayload) ToMap() (map[string]interface{}, error) 
 	}
 	toSerialize["name"] = o.Name
 	toSerialize["type"] = o.Type
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -210,15 +215,23 @@ func (o *RegisterPlatformRequestPayload) UnmarshalJSON(data []byte) (err error) 
 
 	varRegisterPlatformRequestPayload := _RegisterPlatformRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varRegisterPlatformRequestPayload)
+	err = json.Unmarshal(data, &varRegisterPlatformRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = RegisterPlatformRequestPayload(varRegisterPlatformRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "type")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

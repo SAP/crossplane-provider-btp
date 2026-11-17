@@ -32,7 +32,10 @@ type BtpCliXsIdentityProvider struct {
 	SapBtpCli *string `json:"sapBtpCli,omitempty"`
 	Protocol *string `json:"protocol,omitempty"`
 	ReadOnly *bool `json:"readOnly,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _BtpCliXsIdentityProvider BtpCliXsIdentityProvider
 
 // NewBtpCliXsIdentityProvider instantiates a new BtpCliXsIdentityProvider object
 // This constructor will assign default values to properties that have it defined,
@@ -516,7 +519,45 @@ func (o BtpCliXsIdentityProvider) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.ReadOnly) {
 		toSerialize["readOnly"] = o.ReadOnly
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *BtpCliXsIdentityProvider) UnmarshalJSON(data []byte) (err error) {
+	varBtpCliXsIdentityProvider := _BtpCliXsIdentityProvider{}
+
+	err = json.Unmarshal(data, &varBtpCliXsIdentityProvider)
+
+	if err != nil {
+		return err
+	}
+
+	*o = BtpCliXsIdentityProvider(varBtpCliXsIdentityProvider)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "originKey")
+		delete(additionalProperties, "typeOfTrust")
+		delete(additionalProperties, "status")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "identityProvider")
+		delete(additionalProperties, "domain")
+		delete(additionalProperties, "linkTextForUserLogon")
+		delete(additionalProperties, "availableForUserLogon")
+		delete(additionalProperties, "createShadowUsersDuringLogon")
+		delete(additionalProperties, "sapBtpCli")
+		delete(additionalProperties, "protocol")
+		delete(additionalProperties, "readOnly")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableBtpCliXsIdentityProvider struct {

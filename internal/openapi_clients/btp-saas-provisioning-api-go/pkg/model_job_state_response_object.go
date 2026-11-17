@@ -28,7 +28,10 @@ type JobStateResponseObject struct {
 	State *string `json:"state,omitempty"`
 	// The state details of the corresponding job.
 	StateDetails map[string]map[string]interface{} `json:"stateDetails,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _JobStateResponseObject JobStateResponseObject
 
 // NewJobStateResponseObject instantiates a new JobStateResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -232,7 +235,37 @@ func (o JobStateResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.StateDetails) {
 		toSerialize["stateDetails"] = o.StateDetails
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *JobStateResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varJobStateResponseObject := _JobStateResponseObject{}
+
+	err = json.Unmarshal(data, &varJobStateResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = JobStateResponseObject(varJobStateResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "createdBy")
+		delete(additionalProperties, "error")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "state")
+		delete(additionalProperties, "stateDetails")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableJobStateResponseObject struct {

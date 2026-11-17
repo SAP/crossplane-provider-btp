@@ -20,7 +20,10 @@ var _ MappedNullable = &Credentials{}
 // Credentials Credentials to  authenticate with the SAP Service Manager.
 type Credentials struct {
 	Basic *CredentialsBasic `json:"basic,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _Credentials Credentials
 
 // NewCredentials instantiates a new Credentials object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o Credentials) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Basic) {
 		toSerialize["basic"] = o.Basic
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *Credentials) UnmarshalJSON(data []byte) (err error) {
+	varCredentials := _Credentials{}
+
+	err = json.Unmarshal(data, &varCredentials)
+
+	if err != nil {
+		return err
+	}
+
+	*o = Credentials(varCredentials)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "basic")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableCredentials struct {

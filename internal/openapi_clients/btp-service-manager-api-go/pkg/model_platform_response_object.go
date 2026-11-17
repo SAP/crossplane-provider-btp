@@ -37,7 +37,10 @@ type PlatformResponseObject struct {
 	Type *string `json:"type,omitempty"`
 	// The last time the platform was updated. <br/>In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _PlatformResponseObject PlatformResponseObject
 
 // NewPlatformResponseObject instantiates a new PlatformResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -381,7 +384,41 @@ func (o PlatformResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *PlatformResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varPlatformResponseObject := _PlatformResponseObject{}
+
+	err = json.Unmarshal(data, &varPlatformResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = PlatformResponseObject(varPlatformResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "last_operation")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "type")
+		delete(additionalProperties, "updated_at")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullablePlatformResponseObject struct {

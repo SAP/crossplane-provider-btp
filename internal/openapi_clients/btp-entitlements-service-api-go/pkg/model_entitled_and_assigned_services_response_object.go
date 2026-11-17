@@ -25,7 +25,10 @@ type EntitledAndAssignedServicesResponseObject struct {
 	EntitledServices []EntitledServicesResponseObject `json:"entitledServices,omitempty"`
 	// Whether the External Provider Registry (XPR) is available.
 	FetchErrorFromExternalProviderRegistry *bool `json:"fetchErrorFromExternalProviderRegistry,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EntitledAndAssignedServicesResponseObject EntitledAndAssignedServicesResponseObject
 
 // NewEntitledAndAssignedServicesResponseObject instantiates a new EntitledAndAssignedServicesResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o EntitledAndAssignedServicesResponseObject) ToMap() (map[string]interface
 	if !IsNil(o.FetchErrorFromExternalProviderRegistry) {
 		toSerialize["fetchErrorFromExternalProviderRegistry"] = o.FetchErrorFromExternalProviderRegistry
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EntitledAndAssignedServicesResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varEntitledAndAssignedServicesResponseObject := _EntitledAndAssignedServicesResponseObject{}
+
+	err = json.Unmarshal(data, &varEntitledAndAssignedServicesResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EntitledAndAssignedServicesResponseObject(varEntitledAndAssignedServicesResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "assignedServices")
+		delete(additionalProperties, "entitledServices")
+		delete(additionalProperties, "fetchErrorFromExternalProviderRegistry")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEntitledAndAssignedServicesResponseObject struct {

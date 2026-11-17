@@ -21,7 +21,10 @@ var _ MappedNullable = &UpdateApplicationDependenciesRequestPayload{}
 type UpdateApplicationDependenciesRequestPayload struct {
 	// A JSON object with key-value pairs. Values can further be JSON objects. (nested structure)
 	AppProviderCustomProperties map[string]map[string]interface{} `json:"appProviderCustomProperties,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UpdateApplicationDependenciesRequestPayload UpdateApplicationDependenciesRequestPayload
 
 // NewUpdateApplicationDependenciesRequestPayload instantiates a new UpdateApplicationDependenciesRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -85,7 +88,33 @@ func (o UpdateApplicationDependenciesRequestPayload) ToMap() (map[string]interfa
 	if !IsNil(o.AppProviderCustomProperties) {
 		toSerialize["appProviderCustomProperties"] = o.AppProviderCustomProperties
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UpdateApplicationDependenciesRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varUpdateApplicationDependenciesRequestPayload := _UpdateApplicationDependenciesRequestPayload{}
+
+	err = json.Unmarshal(data, &varUpdateApplicationDependenciesRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UpdateApplicationDependenciesRequestPayload(varUpdateApplicationDependenciesRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "appProviderCustomProperties")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUpdateApplicationDependenciesRequestPayload struct {

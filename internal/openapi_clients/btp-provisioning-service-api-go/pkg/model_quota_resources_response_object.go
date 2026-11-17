@@ -32,8 +32,11 @@ type QuotaResourcesResponseObject struct {
 	// Unique technical name of the resource.
 	ResourceTechnicalName *string `json:"resourceTechnicalName,omitempty"`
 	// Type of the resource.
-	ResourceType *string `json:"resourceType,omitempty"`
+	ResourceType         *string `json:"resourceType,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _QuotaResourcesResponseObject QuotaResourcesResponseObject
 
 // NewQuotaResourcesResponseObject instantiates a new QuotaResourcesResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -277,7 +280,7 @@ func (o *QuotaResourcesResponseObject) SetResourceType(v string) {
 }
 
 func (o QuotaResourcesResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -307,7 +310,39 @@ func (o QuotaResourcesResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.ResourceType) {
 		toSerialize["resourceType"] = o.ResourceType
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *QuotaResourcesResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varQuotaResourcesResponseObject := _QuotaResourcesResponseObject{}
+
+	err = json.Unmarshal(data, &varQuotaResourcesResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = QuotaResourcesResponseObject(varQuotaResourcesResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "additionalInfo")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "resourceData")
+		delete(additionalProperties, "resourceProvider")
+		delete(additionalProperties, "resourceTechnicalName")
+		delete(additionalProperties, "resourceType")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableQuotaResourcesResponseObject struct {
@@ -345,5 +380,3 @@ func (v *NullableQuotaResourcesResponseObject) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

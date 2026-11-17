@@ -217,7 +217,7 @@ resources:
         importStatements: []
     btp_directory_role_collection_assignment:
         subCategory: ""
-        description: 'Assigns a user to a role collection on a directory level. Tip: You must be assigned to the admin role of the global account or the directory.'
+        description: 'Assigns a user to a role collection on a directory level. Tip: You must be assigned to the admin role collection of the global account or the directory to create or delete assignments. Since provider version 1.26.0 drift detection reads the current assignments directly from the directory. The user running Terraform therefore additionally needs read access to users and role collections in the directory. Without it, terraform plan and terraform apply fail with an authorization error.'
         name: btp_directory_role_collection_assignment
         title: btp_directory_role_collection_assignment Resource - terraform-provider-btp
         examples:
@@ -387,7 +387,7 @@ resources:
         importStatements: []
     btp_globalaccount_role_collection_assignment:
         subCategory: ""
-        description: 'Assigns a user or a group to a role collection on global account level. Tip: You must be assigned to the admin role of the global account.'
+        description: 'Assigns a user or a group to a role collection on global account level. Tip: You must be assigned to the admin role collection of the global account to create or delete assignments. Since provider version 1.26.0 drift detection reads the current assignments directly from the global account. The user running Terraform therefore additionally needs read access to users and role collections in the global account. Without it, terraform plan and terraform apply fail with an authorization error.'
         name: btp_globalaccount_role_collection_assignment
         title: btp_globalaccount_role_collection_assignment Resource - terraform-provider-btp
         examples:
@@ -539,7 +539,7 @@ resources:
             parent_features: (Set of String) The features of parent entity of the subaccount.
             parent_id: (String) The ID of the subaccount’s parent entity. If the subaccount is located directly in the global account (not in a directory), then this is the ID of the global account.
             region: (String) The region in which the subaccount was created.
-            skip_auto_entitlement: (Boolean) Specifies if the subaccount creation excludes the auto-assignment of base entitlements, allowing quicker setup with potentially reduced resource consumption. When not set or set to 'false' the standard auto-assigned plans are included.
+            skip_auto_entitlement: (Boolean) Controls whether automatic assignment of base entitlements is skipped during subaccount creation. When omitted or set to false, the standard auto-assigned plans are included. Changing between true and either false or an omitted value requires deletion and recreation of the subaccount. Changing between omitted and false updates Terraform state only.
             state: '(String) The current state of the subaccount. Possible values are:'
             subdomain: (String) The subdomain that becomes part of the path used to access the authorization tenant of the subaccount. Must be unique within the defined region and cannot be changed after the subaccount has been created.
             usage: '(String) Shows whether the subaccount is used for production purposes. This flag can help your cloud operator to take appropriate action when handling incidents that are related to mission-critical accounts in production systems. Do not apply for subaccounts that are used for nonproduction purposes, such as development, testing, and demos. Applying this setting this does not modify the subaccount. Possible values are:'
@@ -1049,7 +1049,7 @@ resources:
         importStatements: []
     btp_subaccount_role_collection_assignment:
         subCategory: ""
-        description: 'Assigns a user to a role collection on a subaccount level. Tip: You must be assigned to the admin role of the subaccount.'
+        description: 'Assigns a user to a role collection on a subaccount level. Tip: You must be assigned to the admin role collection of the subaccount (e.g. Subaccount Administrator) to create or delete assignments. Since provider version 1.26.0 drift detection reads the current assignments directly from the subaccount. The user running Terraform therefore additionally needs read access to users and role collections in the subaccount (e.g. the Subaccount Viewer role collection, which includes the User and Role Auditor role). Global account level role collections do not grant this access. Without it, terraform plan and terraform apply fail with an authorization error.'
         name: btp_subaccount_role_collection_assignment
         title: btp_subaccount_role_collection_assignment Resource - terraform-provider-btp
         examples:
@@ -1216,7 +1216,6 @@ resources:
             id: (String) The ID of the service broker.
             key: (String, Sensitive) PEM-encoded private key matching the client certificate. cert and key must be supplied together.
             last_modified: (String) The date and time when the resource was last modified in RFC3339 format.
-            mtls: (Boolean) Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
             name: (String) The name of the service broker.
             password: (String, Sensitive) The password for basic authentication against the service broker.
             ready: (Boolean) Shows whether the service broker is ready.
@@ -1331,6 +1330,7 @@ resources:
             dashboard_url: (String) The URL of the web-based management UI for the service instance.
             delete: (String) Timeout for deleting the service instance.
             id: (String) The ID of the service instance.
+            instances_retrievable: set to true). If parameters are not retrievable from the backend API, ensure you declare parameters in your resource block matching the existing state to prevent unintended configuration drift during terraform plan.
             labels: (Map of Set of String) The set of words or phrases assigned to the service instance.
             last_modified: (String) The date and time when the resource was last modified in RFC3339 format.
             name: (String) The name of the service instance.

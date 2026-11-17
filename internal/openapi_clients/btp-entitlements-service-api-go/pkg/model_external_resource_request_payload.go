@@ -29,7 +29,10 @@ type ExternalResourceRequestPayload struct {
 	ResourceTechnicalName *string `json:"resourceTechnicalName,omitempty"`
 	// The type of the provider. For example infrastructure-as-a-service (IaaS).
 	ResourceType *string `json:"resourceType,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ExternalResourceRequestPayload ExternalResourceRequestPayload
 
 // NewExternalResourceRequestPayload instantiates a new ExternalResourceRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -233,7 +236,37 @@ func (o ExternalResourceRequestPayload) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.ResourceType) {
 		toSerialize["resourceType"] = o.ResourceType
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ExternalResourceRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varExternalResourceRequestPayload := _ExternalResourceRequestPayload{}
+
+	err = json.Unmarshal(data, &varExternalResourceRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ExternalResourceRequestPayload(varExternalResourceRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "resourceData")
+		delete(additionalProperties, "resourceName")
+		delete(additionalProperties, "resourceProvider")
+		delete(additionalProperties, "resourceTechnicalName")
+		delete(additionalProperties, "resourceType")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableExternalResourceRequestPayload struct {

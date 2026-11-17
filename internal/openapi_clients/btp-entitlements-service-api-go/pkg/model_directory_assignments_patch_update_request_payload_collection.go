@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -22,6 +21,7 @@ var _ MappedNullable = &DirectoryAssignmentsPatchUpdateRequestPayloadCollection{
 // DirectoryAssignmentsPatchUpdateRequestPayloadCollection JSON object that contains the specifications of an assignment, such as the name of the assigned plan and whether to distribute the quota and how much to subaccounts that currently exist in the directory and to subaccounts that will be added to the directory in the future.
 type DirectoryAssignmentsPatchUpdateRequestPayloadCollection struct {
 	EntitlementUpdates []DirectoryAssignmentsPatchUpdateRequestPayload `json:"entitlementUpdates"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _DirectoryAssignmentsPatchUpdateRequestPayloadCollection DirectoryAssignmentsPatchUpdateRequestPayloadCollection
@@ -79,6 +79,11 @@ func (o DirectoryAssignmentsPatchUpdateRequestPayloadCollection) MarshalJSON() (
 func (o DirectoryAssignmentsPatchUpdateRequestPayloadCollection) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["entitlementUpdates"] = o.EntitlementUpdates
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -106,15 +111,20 @@ func (o *DirectoryAssignmentsPatchUpdateRequestPayloadCollection) UnmarshalJSON(
 
 	varDirectoryAssignmentsPatchUpdateRequestPayloadCollection := _DirectoryAssignmentsPatchUpdateRequestPayloadCollection{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varDirectoryAssignmentsPatchUpdateRequestPayloadCollection)
+	err = json.Unmarshal(data, &varDirectoryAssignmentsPatchUpdateRequestPayloadCollection)
 
 	if err != nil {
 		return err
 	}
 
 	*o = DirectoryAssignmentsPatchUpdateRequestPayloadCollection(varDirectoryAssignmentsPatchUpdateRequestPayloadCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "entitlementUpdates")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

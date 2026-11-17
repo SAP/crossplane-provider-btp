@@ -1965,18 +1965,21 @@ func (a *RolecollectionsAPIService) GetRoleCollectionByNameExecute(r Rolecollect
 		parameterAddToHeaderOrQuery(localVarQueryParams, "withRoles", r.withRoles, "form", "")
 	} else {
 		var defaultValue bool = true
+		parameterAddToHeaderOrQuery(localVarQueryParams, "withRoles", defaultValue, "form", "")
 		r.withRoles = &defaultValue
 	}
 	if r.withUsers != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "withUsers", r.withUsers, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "withUsers", defaultValue, "form", "")
 		r.withUsers = &defaultValue
 	}
 	if r.withGroups != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "withGroups", r.withGroups, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "withGroups", defaultValue, "form", "")
 		r.withGroups = &defaultValue
 	}
 	// to determine the Content-Type header

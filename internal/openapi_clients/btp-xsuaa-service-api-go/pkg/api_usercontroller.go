@@ -260,6 +260,7 @@ func (a *UsercontrollerAPIService) AddRoleCollectionExecute(r UsercontrollerAPIA
 		parameterAddToHeaderOrQuery(localVarQueryParams, "createUserIfMissing", r.createUserIfMissing, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "createUserIfMissing", defaultValue, "form", "")
 		r.createUserIfMissing = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1423,6 +1424,7 @@ func (a *UsercontrollerAPIService) GetUserNamesExecute(r UsercontrollerAPIGetUse
 		parameterAddToHeaderOrQuery(localVarQueryParams, "details", r.details, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "details", defaultValue, "form", "")
 		r.details = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1740,6 +1742,7 @@ func (a *UsercontrollerAPIService) UpdateUserExecute(r UsercontrollerAPIUpdateUs
 		parameterAddToHeaderOrQuery(localVarQueryParams, "onlyRoleCollections", r.onlyRoleCollections, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "onlyRoleCollections", defaultValue, "form", "")
 		r.onlyRoleCollections = &defaultValue
 	}
 	// to determine the Content-Type header

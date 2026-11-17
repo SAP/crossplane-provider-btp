@@ -27,7 +27,10 @@ type OAuth2Configuration struct {
 	Allowedproviders []string `json:"allowedproviders,omitempty"`
 	RedirectUris []string `json:"redirect-uris,omitempty"`
 	CredentialTypes []string `json:"credential-types,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _OAuth2Configuration OAuth2Configuration
 
 // NewOAuth2Configuration instantiates a new OAuth2Configuration object
 // This constructor will assign default values to properties that have it defined,
@@ -336,7 +339,40 @@ func (o OAuth2Configuration) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.CredentialTypes) {
 		toSerialize["credential-types"] = o.CredentialTypes
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *OAuth2Configuration) UnmarshalJSON(data []byte) (err error) {
+	varOAuth2Configuration := _OAuth2Configuration{}
+
+	err = json.Unmarshal(data, &varOAuth2Configuration)
+
+	if err != nil {
+		return err
+	}
+
+	*o = OAuth2Configuration(varOAuth2Configuration)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "token-validity")
+		delete(additionalProperties, "refresh-token-validity")
+		delete(additionalProperties, "autoapprove")
+		delete(additionalProperties, "grant-types")
+		delete(additionalProperties, "system-attributes")
+		delete(additionalProperties, "allowedproviders")
+		delete(additionalProperties, "redirect-uris")
+		delete(additionalProperties, "credential-types")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableOAuth2Configuration struct {

@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -31,6 +30,7 @@ type CreateServiceBindingRequestPayload struct {
 	Parameters *map[string]string `json:"parameters,omitempty"`
 	// The id of the service instance associated with the binding.
 	ServiceInstanceId string `json:"service_instance_id"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _CreateServiceBindingRequestPayload CreateServiceBindingRequestPayload
@@ -219,6 +219,11 @@ func (o CreateServiceBindingRequestPayload) ToMap() (map[string]interface{}, err
 		toSerialize["parameters"] = o.Parameters
 	}
 	toSerialize["service_instance_id"] = o.ServiceInstanceId
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -247,15 +252,24 @@ func (o *CreateServiceBindingRequestPayload) UnmarshalJSON(data []byte) (err err
 
 	varCreateServiceBindingRequestPayload := _CreateServiceBindingRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varCreateServiceBindingRequestPayload)
+	err = json.Unmarshal(data, &varCreateServiceBindingRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = CreateServiceBindingRequestPayload(varCreateServiceBindingRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "bind_resource")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "service_instance_id")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

@@ -22,7 +22,10 @@ type AbstractIdentityProviderDefinition struct {
 	EmailDomain []string `json:"emailDomain,omitempty"`
 	AdditionalConfiguration map[string]map[string]interface{} `json:"additionalConfiguration,omitempty"`
 	ProviderDescription *string `json:"providerDescription,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AbstractIdentityProviderDefinition AbstractIdentityProviderDefinition
 
 // NewAbstractIdentityProviderDefinition instantiates a new AbstractIdentityProviderDefinition object
 // This constructor will assign default values to properties that have it defined,
@@ -156,7 +159,35 @@ func (o AbstractIdentityProviderDefinition) ToMap() (map[string]interface{}, err
 	if !IsNil(o.ProviderDescription) {
 		toSerialize["providerDescription"] = o.ProviderDescription
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AbstractIdentityProviderDefinition) UnmarshalJSON(data []byte) (err error) {
+	varAbstractIdentityProviderDefinition := _AbstractIdentityProviderDefinition{}
+
+	err = json.Unmarshal(data, &varAbstractIdentityProviderDefinition)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AbstractIdentityProviderDefinition(varAbstractIdentityProviderDefinition)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "emailDomain")
+		delete(additionalProperties, "additionalConfiguration")
+		delete(additionalProperties, "providerDescription")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAbstractIdentityProviderDefinition struct {

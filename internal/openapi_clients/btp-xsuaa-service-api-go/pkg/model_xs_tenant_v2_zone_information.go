@@ -32,7 +32,10 @@ type XSTenantV2ZoneInformation struct {
 	AppTid *string `json:"app_tid,omitempty"`
 	ErrorDetails *string `json:"error_details,omitempty"`
 	PartitionedCookies *bool `json:"partitionedCookies,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _XSTenantV2ZoneInformation XSTenantV2ZoneInformation
 
 // NewXSTenantV2ZoneInformation instantiates a new XSTenantV2ZoneInformation object
 // This constructor will assign default values to properties that have it defined,
@@ -516,7 +519,45 @@ func (o XSTenantV2ZoneInformation) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.PartitionedCookies) {
 		toSerialize["partitionedCookies"] = o.PartitionedCookies
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *XSTenantV2ZoneInformation) UnmarshalJSON(data []byte) (err error) {
+	varXSTenantV2ZoneInformation := _XSTenantV2ZoneInformation{}
+
+	err = json.Unmarshal(data, &varXSTenantV2ZoneInformation)
+
+	if err != nil {
+		return err
+	}
+
+	*o = XSTenantV2ZoneInformation(varXSTenantV2ZoneInformation)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "status")
+		delete(additionalProperties, "zoneId")
+		delete(additionalProperties, "iasTenantUri")
+		delete(additionalProperties, "iasTenantBrowserUri")
+		delete(additionalProperties, "authentication")
+		delete(additionalProperties, "authorization_endpoint")
+		delete(additionalProperties, "token_endpoint")
+		delete(additionalProperties, "userinfo_endpoint")
+		delete(additionalProperties, "end_session_endpoint")
+		delete(additionalProperties, "oidc_metadata")
+		delete(additionalProperties, "app_tid")
+		delete(additionalProperties, "error_details")
+		delete(additionalProperties, "partitionedCookies")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableXSTenantV2ZoneInformation struct {

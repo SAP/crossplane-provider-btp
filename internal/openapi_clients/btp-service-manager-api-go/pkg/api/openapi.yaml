@@ -95,7 +95,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentVersionsResponseObject'
+                $ref: "#/components/schemas/AgentVersionsResponseObject"
           description: Found the list of supported agent versions (Ok)
       summary: Get all agent versions
       tags:
@@ -151,7 +151,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlatformResponseList'
+                $ref: "#/components/schemas/PlatformResponseList"
           description: Found platforms (OK)
           headers:
             Link:
@@ -166,19 +166,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get all platforms
       tags:
@@ -194,7 +194,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterPlatformRequestPayload'
+              $ref: "#/components/schemas/RegisterPlatformRequestPayload"
         description: Details of the platform to register.
         required: true
       responses:
@@ -202,31 +202,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisteredPlatformResponseObject'
+                $ref: "#/components/schemas/RegisteredPlatformResponseObject"
           description: Created
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Register a platform
       tags:
@@ -284,44 +284,44 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Platform not found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "412":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Target resource updated since this request sent (Precondition
             Failed)
         "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unprocessable Entity
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Unregister a platform
       tags:
@@ -344,37 +344,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlatformResponseObject'
+                $ref: "#/components/schemas/PlatformResponseObject"
           description: Found platform (OK)
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Platform not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get platform details
       tags:
@@ -396,7 +396,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdatePlatformRequestPayload'
+              $ref: "#/components/schemas/UpdatePlatformRequestPayload"
         description: Details of the platform to update.
         required: true
       responses:
@@ -404,7 +404,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdatedPlatformResponseObject'
+                $ref: "#/components/schemas/UpdatedPlatformResponseObject"
           description: Updated (OK)
         "202":
           content:
@@ -416,38 +416,38 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "412":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Target resource updated since this request sent (Precondition
             Failed)
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Update a platform
       tags:
@@ -503,7 +503,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceBindingResponseList'
+                $ref: "#/components/schemas/ServiceBindingResponseList"
           description: Found service bindings (OK)
           headers:
             Link:
@@ -518,19 +518,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get all service bindings
       tags:
@@ -553,7 +553,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateServiceBindingRequestPayload'
+              $ref: "#/components/schemas/CreateServiceBindingRequestPayload"
         description: Configure a new service binding to obtain the access credentials
           to the service instance.
         required: true
@@ -562,7 +562,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreatedServiceBindingResponseObject'
+                $ref: "#/components/schemas/CreatedServiceBindingResponseObject"
           description: Created
         "202":
           content:
@@ -583,38 +583,38 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "412":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Target resource updated since this request sent (Precondition
             Failed)
         "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unprocessable Entity
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Create a service binding
       tags:
@@ -668,38 +668,38 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service binding not found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "412":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Target resource updated since this request sent (Precondition
             Failed)
         "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unprocessable Entity
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Delete a service binding
       tags:
@@ -722,31 +722,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceBindingResponseObject'
+                $ref: "#/components/schemas/ServiceBindingResponseObject"
           description: Found service binding (OK)
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service binding not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get service binding details
       tags:
@@ -783,31 +783,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service binding configuration parameters were not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
         "502":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Geteway
       summary: Get service binding parameters
       tags:
@@ -863,7 +863,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceBrokerResponseList'
+                $ref: "#/components/schemas/ServiceBrokerResponseList"
           description: Found service brokers (OK)
           headers:
             Link:
@@ -878,19 +878,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get all service brokers
       tags:
@@ -914,31 +914,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceBrokerResponseObject'
+                $ref: "#/components/schemas/ServiceBrokerResponseObject"
           description: Found service broker (OK)
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service broker not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get service broker details.
       tags:
@@ -994,7 +994,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceInstanceResponseList'
+                $ref: "#/components/schemas/ServiceInstanceResponseList"
           description: Found service instances (OK)
           headers:
             Link:
@@ -1009,19 +1009,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get all service instances
       tags:
@@ -1057,7 +1057,7 @@ paths:
                   name: my-service-instance
                   service_plan_id: fd1fdfd8-4891-8d91-46334e04600d
             schema:
-              $ref: '#/components/schemas/CreateServiceInstanceRequestPayload'
+              $ref: "#/components/schemas/CreateServiceInstanceRequestPayload"
         description: Details of the service instance to register.<br/><br/>Create
           an instance by providing the values for one of the following sections:<br/>
           •CreateByPlanID<br/> •CreateByOfferingAndPlanName
@@ -1067,7 +1067,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreatedServiceInstanceResponseObject'
+                $ref: "#/components/schemas/CreatedServiceInstanceResponseObject"
           description: Created
         "202":
           content:
@@ -1088,44 +1088,44 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "412":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Target resource has been updated since the request (Precondition
             Failed)
         "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unprocessable Entity
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Create a service instance
       tags:
@@ -1179,44 +1179,44 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service instance not found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "412":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Target resource updated since this request sent (Precondition
             Failed)
         "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unprocessable Entity
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Delete a service instance
       tags:
@@ -1239,37 +1239,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceInstanceResponseObject'
+                $ref: "#/components/schemas/ServiceInstanceResponseObject"
           description: Found service instance (OK)
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service instance not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get service instance details
       tags:
@@ -1300,7 +1300,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateServiceInstanceRequestPayload'
+              $ref: "#/components/schemas/UpdateServiceInstanceRequestPayload"
         description: Details of the service instance to update.
         required: true
       responses:
@@ -1308,7 +1308,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdatedServiceInstanceResponseObject'
+                $ref: "#/components/schemas/UpdatedServiceInstanceResponseObject"
           description: Updated service instance (OK)
         "202":
           content:
@@ -1329,37 +1329,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Conflict
         "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unprocessable Entity
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Update a service instance
       tags:
@@ -1403,37 +1403,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service instance configuration parameters were not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
         "502":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Geteway
       summary: Get service instance parameters
       tags:
@@ -1500,7 +1500,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceOfferingResponseList'
+                $ref: "#/components/schemas/ServiceOfferingResponseList"
           description: Found service offerings (OK)
           headers:
             Link:
@@ -1515,19 +1515,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get all service offerings
       tags:
@@ -1551,25 +1551,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceOfferingResponseObject'
+                $ref: "#/components/schemas/ServiceOfferingResponseObject"
           description: Found service offering (OK)
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get service offering details
       tags:
@@ -1635,7 +1635,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServicePlanResponseList'
+                $ref: "#/components/schemas/ServicePlanResponseList"
           description: Found service plans (OK)
           headers:
             Link:
@@ -1650,25 +1650,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: BadRequest
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get service plans
       tags:
@@ -1692,31 +1692,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServicePlanResponseObject'
+                $ref: "#/components/schemas/ServicePlanResponseObject"
           description: Found service plan (OK)
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Service plan not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get service plan details
       tags:
@@ -1767,31 +1767,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OperationResponseObject'
+                $ref: "#/components/schemas/OperationResponseObject"
           description: Found asynchronous operation (OK)
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Bad Request
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Operation not found
         "429":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
           description: Too Many Requests
       summary: Get operation status
       tags:
@@ -1804,12 +1804,12 @@ components:
         - 0.11.10
         - 0.11.11
         - 0.11.12
-        k8s:
-        - 0.8.11
-        - 0.8.14
         cf-sap:
         - 0.6.20
         - 0.6.24
+        k8s:
+        - 0.8.11
+        - 0.8.14
       properties:
         cf:
           description: The list of compatible agent versions for the Cloud Foundry
@@ -1890,11 +1890,6 @@ components:
       type: object
     CreateByPlanID:
       example:
-        name: my-service-instance
-        service_plan_id: fd1fdfd8-4891-8d91-46334e04600d
-        parameters:
-          parameter1: value1
-          parameter2: value2
         labels:
           label1:
           - value1
@@ -1904,6 +1899,11 @@ components:
           - value1
           - value2
           - value3
+        name: my-service-instance
+        parameters:
+          parameter1: value1
+          parameter2: value2
+        service_plan_id: fd1fdfd8-4891-8d91-46334e04600d
       properties:
         labels:
           additionalProperties:
@@ -1950,14 +1950,9 @@ components:
       type: object
     CreateServiceBindingRequestPayload:
       example:
-        name: my-service-binding
         bind_resource:
           app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
           space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
-        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
-        parameters:
-          parameter1: value1
-          parameter2: value2
         labels:
           label1:
           - value1
@@ -1967,6 +1962,11 @@ components:
           - value1
           - value2
           - value3
+        name: my-service-binding
+        parameters:
+          parameter1: value1
+          parameter2: value2
+        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
       properties:
         bind_resource:
           description: "The bind_resource object contains platform-specific information\
@@ -2027,22 +2027,18 @@ components:
       type: object
     CreateServiceInstanceRequestPayload:
       oneOf:
-      - $ref: '#/components/schemas/CreateByPlanID'
-      - $ref: '#/components/schemas/CreateByOfferingAndPlanName'
+      - $ref: "#/components/schemas/CreateByPlanID"
+      - $ref: "#/components/schemas/CreateByOfferingAndPlanName"
     CreatedServiceBindingResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        credentials: "{}"
-        ready: true
-        context:
-          account: my-account
-        name: my-service-binding
-        created_at: 2000-01-23T04:56:07.000+00:00
         bind_resource:
           app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
           space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
+        context:
+          account: my-account
+        created_at: 2000-01-23T04:56:07.000+00:00
+        credentials: {}
         id: my-service-binding-123-id
-        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
         labels:
           label1:
           - value1
@@ -2052,6 +2048,10 @@ components:
           - value1
           - value2
           - value3
+        name: my-service-binding
+        ready: true
+        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         bind_resource:
           additionalProperties:
@@ -2115,8 +2115,11 @@ components:
       type: object
     CreatedServiceInstanceResponseObject:
       example:
-        shared: true
+        context:
+          account: my-account
         created_at: 2000-01-23T04:56:07.000+00:00
+        dashboard_url: http://my-service-dashboard.com
+        id: my-service-instance-123-id
         labels:
           label1:
           - value1
@@ -2126,19 +2129,16 @@ components:
           - value1
           - value2
           - value3
-        referenced_instance_id: referenced_instance_id
-        usable: true
         maintenance_info:
           version: 1.0.0
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        context:
-          account: my-account
         name: my-service-instance
         platform_id: platform_id
+        ready: true
+        referenced_instance_id: referenced_instance_id
         service_plan_id: service_plan_id
-        id: my-service-instance-123-id
-        dashboard_url: http://my-service-dashboard.com
+        shared: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        usable: true
       properties:
         context:
           additionalProperties:
@@ -2220,7 +2220,7 @@ components:
           username: username
       properties:
         basic:
-          $ref: '#/components/schemas/Credentials_basic'
+          $ref: "#/components/schemas/Credentials_basic"
       type: object
     Error:
       description: A response object that contains details about the error.
@@ -2238,18 +2238,18 @@ components:
     Label:
       description: The request object that contains details about the labels to update.
       example:
+        key: label1
         op: add
         values:
         - value1
         - value2
-        key: label1
       properties:
         key:
           description: The name of the label.
           example: label1
           type: string
         op:
-          description: 'The operation to perform on a label.<br/><br/> Possible values:'
+          description: "The operation to perform on a label.<br/><br/> Possible values:"
           enum:
           - add
           - remove
@@ -2282,13 +2282,9 @@ components:
       type: object
     ListedPlatformResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my-platform
         created_at: 2000-01-23T04:56:07.000+00:00
         description: You can use this platform to develop and to test your applications.
         id: my-platform-123-id
-        type: kubernetes
         labels:
           label1:
           - value1
@@ -2298,6 +2294,10 @@ components:
           - value1
           - value2
           - value3
+        name: my-platform
+        ready: true
+        type: kubernetes
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         created_at:
           description: The time the platform was created. <br/>In ISO 8601 format:</br>
@@ -2351,18 +2351,14 @@ components:
       type: object
     ListedServiceBindingResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        credentials: "{}"
-        ready: true
-        context:
-          account: my-account
-        name: my-service-binding
-        created_at: 2000-01-23T04:56:07.000+00:00
         bind_resource:
           app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
           space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
+        context:
+          account: my-account
+        created_at: 2000-01-23T04:56:07.000+00:00
+        credentials: {}
         id: my-service-binding-123-id
-        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
         labels:
           label1:
           - value1
@@ -2372,6 +2368,10 @@ components:
           - value1
           - value2
           - value3
+        name: my-service-binding
+        ready: true
+        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         bind_resource:
           additionalProperties:
@@ -2435,9 +2435,6 @@ components:
       type: object
     ListedServiceBrokerResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my service broker
         broker_url: http://myservicebroker.domain.com
         created_at: 2000-01-23T04:56:07.000+00:00
         description: Some description here.
@@ -2451,6 +2448,9 @@ components:
           - value1
           - value2
           - value3
+        name: my service broker
+        ready: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         broker_url:
           description: The URL of the service broker.
@@ -2504,8 +2504,11 @@ components:
       type: object
     ListedServiceInstanceResponseObject:
       example:
-        shared: true
+        context:
+          account: my-account
         created_at: 2000-01-23T04:56:07.000+00:00
+        dashboard_url: http://my-service-dashboard.com
+        id: my-service-instance-123-id
         labels:
           label1:
           - value1
@@ -2515,20 +2518,17 @@ components:
           - value1
           - value2
           - value3
-        referenced_instance_id: referenced_instance_id
-        usable: true
         maintenance_info:
           description: version changes
           version: 1.0.0
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        context:
-          account: my-account
         name: my-service-instance
         platform_id: platform_id
+        ready: true
+        referenced_instance_id: referenced_instance_id
         service_plan_id: service_plan_id
-        id: my-service-instance-123-id
-        dashboard_url: http://my-service-dashboard.com
+        shared: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        usable: true
       properties:
         context:
           additionalProperties:
@@ -2605,20 +2605,16 @@ components:
       type: object
     OperationResponseObject:
       example:
-        resource_type: resource_type
+        correlation_id: correlation_id
         created_at: 2000-01-23T04:56:07.000+00:00
-        description: description
         deletion_scheduled: 2000-01-23T04:56:07.000+00:00
-        type: CREATE
-        transitive_resources:
-        - operation_type: operation_type
-          criteria: criteria
-          id: 0aba8e41-5e69-44b1-974f-83100
-          type: type
-        - operation_type: operation_type
-          criteria: criteria
-          id: 0aba8e41-5e69-44b1-974f-83100
-          type: type
+        description: description
+        errors:
+        - description: description
+          error: error
+        - description: description
+          error: error
+        id: dsdssd498da96-e5f3-4402-8
         labels:
           label1:
           - value1
@@ -2628,19 +2624,23 @@ components:
           - value1
           - value2
           - value3
-        reschedule: true
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
         platform_id: platform_id
-        correlation_id: correlation_id
+        ready: true
+        reschedule: true
         resource_id: resource_id
-        id: dsdssd498da96-e5f3-4402-8
+        resource_type: resource_type
         state: in progress
-        errors:
-        - description: description
-          error: error
-        - description: description
-          error: error
+        transitive_resources:
+        - criteria: criteria
+          id: 0aba8e41-5e69-44b1-974f-83100
+          operation_type: operation_type
+          type: type
+        - criteria: criteria
+          id: 0aba8e41-5e69-44b1-974f-83100
+          operation_type: operation_type
+          type: type
+        type: CREATE
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         correlation_id:
           description: The correlation ID received from the request related to this
@@ -2661,7 +2661,7 @@ components:
         errors:
           description: The list of the errors if the operation has failed.
           items:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           type: array
         id:
           description: The ID of the operation.
@@ -2713,10 +2713,10 @@ components:
           type: string
         transitive_resources:
           items:
-            $ref: '#/components/schemas/TransitiveResource'
+            $ref: "#/components/schemas/TransitiveResource"
           type: array
         type:
-          description: 'The type of the operation.<br><br> Possible values:'
+          description: "The type of the operation.<br><br> Possible values:"
           enum:
           - CREATE
           - UPDATE
@@ -2731,15 +2731,10 @@ components:
       type: object
     PlatformResponseList:
       example:
-        num_items: 1
         items:
-        - updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          name: my-platform
-          created_at: 2000-01-23T04:56:07.000+00:00
+        - created_at: 2000-01-23T04:56:07.000+00:00
           description: You can use this platform to develop and to test your applications.
           id: my-platform-123-id
-          type: kubernetes
           labels:
             label1:
             - value1
@@ -2749,13 +2744,13 @@ components:
             - value1
             - value2
             - value3
-        - updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
           name: my-platform
-          created_at: 2000-01-23T04:56:07.000+00:00
+          ready: true
+          type: kubernetes
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        - created_at: 2000-01-23T04:56:07.000+00:00
           description: You can use this platform to develop and to test your applications.
           id: my-platform-123-id
-          type: kubernetes
           labels:
             label1:
             - value1
@@ -2765,13 +2760,18 @@ components:
             - value1
             - value2
             - value3
+          name: my-platform
+          ready: true
+          type: kubernetes
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        num_items: 1
         token: token
       properties:
         items:
           description: The list of response objects that contains details about the
             platforms.
           items:
-            $ref: '#/components/schemas/ListedPlatformResponseObject'
+            $ref: "#/components/schemas/ListedPlatformResponseObject"
           type: array
         num_items:
           description: The number of platforms associated with the subaccount.
@@ -2789,50 +2789,9 @@ components:
       type: object
     PlatformResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my-platform
         created_at: 2000-01-23T04:56:07.000+00:00
         description: This platform is used for consumption.
         id: my-platform-123-id
-        type: kubernetes
-        last_operation:
-          resource_type: resource_type
-          created_at: 2000-01-23T04:56:07.000+00:00
-          description: description
-          deletion_scheduled: 2000-01-23T04:56:07.000+00:00
-          type: CREATE
-          transitive_resources:
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
-          labels:
-            label1:
-            - value1
-            - value2
-            - value3
-            label2:
-            - value1
-            - value2
-            - value3
-          reschedule: true
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          platform_id: platform_id
-          correlation_id: correlation_id
-          resource_id: resource_id
-          id: dsdssd498da96-e5f3-4402-8
-          state: in progress
-          errors:
-          - description: description
-            error: error
-          - description: description
-            error: error
         labels:
           label1:
           - value1
@@ -2842,6 +2801,47 @@ components:
           - value1
           - value2
           - value3
+        last_operation:
+          correlation_id: correlation_id
+          created_at: 2000-01-23T04:56:07.000+00:00
+          deletion_scheduled: 2000-01-23T04:56:07.000+00:00
+          description: description
+          errors:
+          - description: description
+            error: error
+          - description: description
+            error: error
+          id: dsdssd498da96-e5f3-4402-8
+          labels:
+            label1:
+            - value1
+            - value2
+            - value3
+            label2:
+            - value1
+            - value2
+            - value3
+          platform_id: platform_id
+          ready: true
+          reschedule: true
+          resource_id: resource_id
+          resource_type: resource_type
+          state: in progress
+          transitive_resources:
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          type: CREATE
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        name: my-platform
+        ready: true
+        type: kubernetes
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         created_at:
           description: The time the platform was created. <br/>In ISO 8601 format:</br>
@@ -2876,7 +2876,7 @@ components:
             - value3
           type: object
         last_operation:
-          $ref: '#/components/schemas/OperationResponseObject'
+          $ref: "#/components/schemas/OperationResponseObject"
         name:
           description: The name of the platform.
           example: my-platform
@@ -2897,9 +2897,7 @@ components:
       type: object
     RegisterPlatformRequestPayload:
       example:
-        name: my-platform
         description: Try our new features.
-        type: kubernetes
         labels:
           label1:
           - value1
@@ -2909,6 +2907,8 @@ components:
           - value1
           - value2
           - value3
+        name: my-platform
+        type: kubernetes
       properties:
         description:
           description: The description of the platform for customer-facing UIs.
@@ -2950,17 +2950,13 @@ components:
       type: object
     RegisteredPlatformResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
+        created_at: 2000-01-23T04:56:07.000+00:00
         credentials:
           basic:
             password: password
             username: username
-        ready: true
-        name: my-platform
-        created_at: 2000-01-23T04:56:07.000+00:00
         description: Use the platform to develop and to test your software.
         id: my-platform-123-id
-        type: kubernetes
         labels:
           label1:
           - value1
@@ -2970,6 +2966,10 @@ components:
           - value1
           - value2
           - value3
+        name: my-platform
+        ready: true
+        type: kubernetes
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         created_at:
           description: The time the platform was created. <br/>In ISO 8601 format:</br>
@@ -2977,7 +2977,7 @@ components:
           format: date-time
           type: string
         credentials:
-          $ref: '#/components/schemas/Credentials'
+          $ref: "#/components/schemas/Credentials"
         description:
           description: The description of the platform.
           example: Use the platform to develop and to test your software.
@@ -3025,20 +3025,15 @@ components:
       type: object
     ServiceBindingResponseList:
       example:
-        num_items: 1
         items:
-        - updated_at: 2000-01-23T04:56:07.000+00:00
-          credentials: "{}"
-          ready: true
-          context:
-            account: my-account
-          name: my-service-binding
-          created_at: 2000-01-23T04:56:07.000+00:00
-          bind_resource:
+        - bind_resource:
             app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
             space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
+          context:
+            account: my-account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          credentials: {}
           id: my-service-binding-123-id
-          service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
           labels:
             label1:
             - value1
@@ -3048,18 +3043,18 @@ components:
             - value1
             - value2
             - value3
-        - updated_at: 2000-01-23T04:56:07.000+00:00
-          credentials: "{}"
-          ready: true
-          context:
-            account: my-account
           name: my-service-binding
-          created_at: 2000-01-23T04:56:07.000+00:00
-          bind_resource:
+          ready: true
+          service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        - bind_resource:
             app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
             space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
+          context:
+            account: my-account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          credentials: {}
           id: my-service-binding-123-id
-          service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
           labels:
             label1:
             - value1
@@ -3069,13 +3064,18 @@ components:
             - value1
             - value2
             - value3
+          name: my-service-binding
+          ready: true
+          service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        num_items: 1
         token: wcxdX
       properties:
         items:
           description: The list of the response objects that contains details about
             the service bindings.
           items:
-            $ref: '#/components/schemas/ListedServiceBindingResponseObject'
+            $ref: "#/components/schemas/ListedServiceBindingResponseObject"
           type: array
         num_items:
           description: The number of the service bindings associated with the subaccount.
@@ -3094,55 +3094,14 @@ components:
       type: object
     ServiceBindingResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        credentials: "{}"
-        ready: true
-        context:
-          account: my-account
-        name: my-service-binding
-        created_at: 2000-01-23T04:56:07.000+00:00
         bind_resource:
           app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
           space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
+        context:
+          account: my-account
+        created_at: 2000-01-23T04:56:07.000+00:00
+        credentials: {}
         id: my-service-binding-123-id
-        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
-        last_operation:
-          resource_type: resource_type
-          created_at: 2000-01-23T04:56:07.000+00:00
-          description: description
-          deletion_scheduled: 2000-01-23T04:56:07.000+00:00
-          type: CREATE
-          transitive_resources:
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
-          labels:
-            label1:
-            - value1
-            - value2
-            - value3
-            label2:
-            - value1
-            - value2
-            - value3
-          reschedule: true
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          platform_id: platform_id
-          correlation_id: correlation_id
-          resource_id: resource_id
-          id: dsdssd498da96-e5f3-4402-8
-          state: in progress
-          errors:
-          - description: description
-            error: error
-          - description: description
-            error: error
         labels:
           label1:
           - value1
@@ -3152,6 +3111,47 @@ components:
           - value1
           - value2
           - value3
+        last_operation:
+          correlation_id: correlation_id
+          created_at: 2000-01-23T04:56:07.000+00:00
+          deletion_scheduled: 2000-01-23T04:56:07.000+00:00
+          description: description
+          errors:
+          - description: description
+            error: error
+          - description: description
+            error: error
+          id: dsdssd498da96-e5f3-4402-8
+          labels:
+            label1:
+            - value1
+            - value2
+            - value3
+            label2:
+            - value1
+            - value2
+            - value3
+          platform_id: platform_id
+          ready: true
+          reschedule: true
+          resource_id: resource_id
+          resource_type: resource_type
+          state: in progress
+          transitive_resources:
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          type: CREATE
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        name: my-service-binding
+        ready: true
+        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         bind_resource:
           additionalProperties:
@@ -3198,7 +3198,7 @@ components:
             - value3
           type: object
         last_operation:
-          $ref: '#/components/schemas/OperationResponseObject'
+          $ref: "#/components/schemas/OperationResponseObject"
         name:
           description: The name of the service binding.
           example: my-service-binding
@@ -3217,12 +3217,8 @@ components:
       type: object
     ServiceBrokerResponseList:
       example:
-        num_items: 1
         items:
-        - updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          name: my service broker
-          broker_url: http://myservicebroker.domain.com
+        - broker_url: http://myservicebroker.domain.com
           created_at: 2000-01-23T04:56:07.000+00:00
           description: Some description here.
           id: my-service-broker-123-id
@@ -3235,10 +3231,10 @@ components:
             - value1
             - value2
             - value3
-        - updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
           name: my service broker
-          broker_url: http://myservicebroker.domain.com
+          ready: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        - broker_url: http://myservicebroker.domain.com
           created_at: 2000-01-23T04:56:07.000+00:00
           description: Some description here.
           id: my-service-broker-123-id
@@ -3251,13 +3247,17 @@ components:
             - value1
             - value2
             - value3
+          name: my service broker
+          ready: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        num_items: 1
         token: wcxdX
       properties:
         items:
           description: The list of response objects that contains details about the
             service brokers.
           items:
-            $ref: '#/components/schemas/ListedServiceBrokerResponseObject'
+            $ref: "#/components/schemas/ListedServiceBrokerResponseObject"
           type: array
         num_items:
           description: The number of the service brokers associated with the subaccount.
@@ -3276,50 +3276,10 @@ components:
       type: object
     ServiceBrokerResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my service broker
         broker_url: http://myservicebroker.domain.com
         created_at: 2000-01-23T04:56:07.000+00:00
         description: Some description here.
         id: my-service-broker-123-id
-        last_operation:
-          resource_type: resource_type
-          created_at: 2000-01-23T04:56:07.000+00:00
-          description: description
-          deletion_scheduled: 2000-01-23T04:56:07.000+00:00
-          type: CREATE
-          transitive_resources:
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
-          labels:
-            label1:
-            - value1
-            - value2
-            - value3
-            label2:
-            - value1
-            - value2
-            - value3
-          reschedule: true
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          platform_id: platform_id
-          correlation_id: correlation_id
-          resource_id: resource_id
-          id: dsdssd498da96-e5f3-4402-8
-          state: in progress
-          errors:
-          - description: description
-            error: error
-          - description: description
-            error: error
         labels:
           label1:
           - value1
@@ -3329,6 +3289,46 @@ components:
           - value1
           - value2
           - value3
+        last_operation:
+          correlation_id: correlation_id
+          created_at: 2000-01-23T04:56:07.000+00:00
+          deletion_scheduled: 2000-01-23T04:56:07.000+00:00
+          description: description
+          errors:
+          - description: description
+            error: error
+          - description: description
+            error: error
+          id: dsdssd498da96-e5f3-4402-8
+          labels:
+            label1:
+            - value1
+            - value2
+            - value3
+            label2:
+            - value1
+            - value2
+            - value3
+          platform_id: platform_id
+          ready: true
+          reschedule: true
+          resource_id: resource_id
+          resource_type: resource_type
+          state: in progress
+          transitive_resources:
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          type: CREATE
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        name: my service broker
+        ready: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         broker_url:
           description: The URL of the service broker.
@@ -3365,7 +3365,7 @@ components:
             - value3
           type: object
         last_operation:
-          $ref: '#/components/schemas/OperationResponseObject'
+          $ref: "#/components/schemas/OperationResponseObject"
         name:
           description: The name of the service broker.
           example: my service broker
@@ -3384,10 +3384,12 @@ components:
       type: object
     ServiceInstanceResponseList:
       example:
-        num_items: 1
         items:
-        - shared: true
+        - context:
+            account: my-account
           created_at: 2000-01-23T04:56:07.000+00:00
+          dashboard_url: http://my-service-dashboard.com
+          id: my-service-instance-123-id
           labels:
             label1:
             - value1
@@ -3397,22 +3399,22 @@ components:
             - value1
             - value2
             - value3
-          referenced_instance_id: referenced_instance_id
-          usable: true
           maintenance_info:
             description: version changes
             version: 1.0.0
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          context:
-            account: my-account
           name: my-service-instance
           platform_id: platform_id
+          ready: true
+          referenced_instance_id: referenced_instance_id
           service_plan_id: service_plan_id
-          id: my-service-instance-123-id
-          dashboard_url: http://my-service-dashboard.com
-        - shared: true
+          shared: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          usable: true
+        - context:
+            account: my-account
           created_at: 2000-01-23T04:56:07.000+00:00
+          dashboard_url: http://my-service-dashboard.com
+          id: my-service-instance-123-id
           labels:
             label1:
             - value1
@@ -3422,27 +3424,25 @@ components:
             - value1
             - value2
             - value3
-          referenced_instance_id: referenced_instance_id
-          usable: true
           maintenance_info:
             description: version changes
             version: 1.0.0
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          context:
-            account: my-account
           name: my-service-instance
           platform_id: platform_id
+          ready: true
+          referenced_instance_id: referenced_instance_id
           service_plan_id: service_plan_id
-          id: my-service-instance-123-id
-          dashboard_url: http://my-service-dashboard.com
+          shared: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          usable: true
+        num_items: 1
         token: wcxdX
       properties:
         items:
           description: The list of response objects that contains details about the
             service instances.
           items:
-            $ref: '#/components/schemas/ListedServiceInstanceResponseObject'
+            $ref: "#/components/schemas/ListedServiceInstanceResponseObject"
           type: array
         num_items:
           description: The number of service instances associated with the subaccount.
@@ -3461,8 +3461,11 @@ components:
       type: object
     ServiceInstanceResponseObject:
       example:
-        shared: true
+        context:
+          account: my-account
         created_at: 2000-01-23T04:56:07.000+00:00
+        dashboard_url: http://my-service-dashboard.com
+        id: my-service-instance-123-id
         labels:
           label1:
           - value1
@@ -3472,34 +3475,17 @@ components:
           - value1
           - value2
           - value3
-        referenced_instance_id: referenced_instance_id
-        usable: true
-        maintenance_info:
-          version: 1.0.0
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        context:
-          account: my-account
-        name: my-service-instance
-        platform_id: platform_id
-        service_plan_id: service_plan_id
-        id: my-service-instance-123-id
-        dashboard_url: http://my-service-dashboard.com
         last_operation:
-          resource_type: resource_type
+          correlation_id: correlation_id
           created_at: 2000-01-23T04:56:07.000+00:00
-          description: description
           deletion_scheduled: 2000-01-23T04:56:07.000+00:00
-          type: CREATE
-          transitive_resources:
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
-          - operation_type: operation_type
-            criteria: criteria
-            id: 0aba8e41-5e69-44b1-974f-83100
-            type: type
+          description: description
+          errors:
+          - description: description
+            error: error
+          - description: description
+            error: error
+          id: dsdssd498da96-e5f3-4402-8
           labels:
             label1:
             - value1
@@ -3509,19 +3495,33 @@ components:
             - value1
             - value2
             - value3
-          reschedule: true
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
           platform_id: platform_id
-          correlation_id: correlation_id
+          ready: true
+          reschedule: true
           resource_id: resource_id
-          id: dsdssd498da96-e5f3-4402-8
+          resource_type: resource_type
           state: in progress
-          errors:
-          - description: description
-            error: error
-          - description: description
-            error: error
+          transitive_resources:
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          - criteria: criteria
+            id: 0aba8e41-5e69-44b1-974f-83100
+            operation_type: operation_type
+            type: type
+          type: CREATE
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        maintenance_info:
+          version: 1.0.0
+        name: my-service-instance
+        platform_id: platform_id
+        ready: true
+        referenced_instance_id: referenced_instance_id
+        service_plan_id: service_plan_id
+        shared: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        usable: true
       properties:
         context:
           additionalProperties:
@@ -3562,7 +3562,7 @@ components:
             - value3
           type: object
         last_operation:
-          $ref: '#/components/schemas/OperationResponseObject'
+          $ref: "#/components/schemas/OperationResponseObject"
         maintenance_info:
           additionalProperties:
             type: string
@@ -3598,10 +3598,10 @@ components:
       type: object
     ServiceOfferingMetadata:
       example:
-        longDescription: longDescription
-        documentationUrl: documentationUrl
         displayName: displayName
+        documentationUrl: documentationUrl
         imageUrl: imageUrl
+        longDescription: longDescription
         supportUrl: supportUrl
       properties:
         displayName:
@@ -3622,60 +3622,60 @@ components:
       type: object
     ServiceOfferingResponseList:
       example:
-        num_items: 1
         items:
         - allow_context_updates: true
-          catalog_name: catalog_name
-          metadata:
-            longDescription: longDescription
-            documentationUrl: documentationUrl
-            displayName: displayName
-            imageUrl: imageUrl
-            supportUrl: supportUrl
-          instances_retrievable: true
+          bindable: true
+          bindings_retrievable: true
           broker_id: broker_id
+          catalog_id: catalog_id
+          catalog_name: catalog_name
           created_at: 2000-01-23T04:56:07.000+00:00
           description: description
+          id: my-service-offering-123-id
+          instances_retrievable: true
+          metadata:
+            displayName: displayName
+            documentationUrl: documentationUrl
+            imageUrl: imageUrl
+            longDescription: longDescription
+            supportUrl: supportUrl
+          name: my-service-offering
+          plan_updateable: true
+          ready: true
           tags:
           - tags
           - tags
-          catalog_id: catalog_id
-          bindable: true
-          plan_updateable: true
           updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          name: my-service-offering
-          id: my-service-offering-123-id
-          bindings_retrievable: true
         - allow_context_updates: true
-          catalog_name: catalog_name
-          metadata:
-            longDescription: longDescription
-            documentationUrl: documentationUrl
-            displayName: displayName
-            imageUrl: imageUrl
-            supportUrl: supportUrl
-          instances_retrievable: true
+          bindable: true
+          bindings_retrievable: true
           broker_id: broker_id
+          catalog_id: catalog_id
+          catalog_name: catalog_name
           created_at: 2000-01-23T04:56:07.000+00:00
           description: description
+          id: my-service-offering-123-id
+          instances_retrievable: true
+          metadata:
+            displayName: displayName
+            documentationUrl: documentationUrl
+            imageUrl: imageUrl
+            longDescription: longDescription
+            supportUrl: supportUrl
+          name: my-service-offering
+          plan_updateable: true
+          ready: true
           tags:
           - tags
           - tags
-          catalog_id: catalog_id
-          bindable: true
-          plan_updateable: true
           updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          name: my-service-offering
-          id: my-service-offering-123-id
-          bindings_retrievable: true
+        num_items: 1
         token: wcxdX
       properties:
         items:
           description: The list of the service offerings.
           items:
-            $ref: '#/components/schemas/ServiceOfferingResponseObject'
+            $ref: "#/components/schemas/ServiceOfferingResponseObject"
           type: array
         num_items:
           description: The number of service offerings associated with the subaccount.
@@ -3695,28 +3695,28 @@ components:
     ServiceOfferingResponseObject:
       example:
         allow_context_updates: true
-        catalog_name: catalog_name
-        metadata:
-          longDescription: longDescription
-          documentationUrl: documentationUrl
-          displayName: displayName
-          imageUrl: imageUrl
-          supportUrl: supportUrl
-        instances_retrievable: true
+        bindable: true
+        bindings_retrievable: true
         broker_id: broker_id
+        catalog_id: catalog_id
+        catalog_name: catalog_name
         created_at: 2000-01-23T04:56:07.000+00:00
         description: description
+        id: my-service-offering-123-id
+        instances_retrievable: true
+        metadata:
+          displayName: displayName
+          documentationUrl: documentationUrl
+          imageUrl: imageUrl
+          longDescription: longDescription
+          supportUrl: supportUrl
+        name: my-service-offering
+        plan_updateable: true
+        ready: true
         tags:
         - tags
         - tags
-        catalog_id: catalog_id
-        bindable: true
-        plan_updateable: true
         updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my-service-offering
-        id: my-service-offering-123-id
-        bindings_retrievable: true
       properties:
         allow_context_updates:
           description: Whether the context for the service offering can be updated.
@@ -3754,7 +3754,7 @@ components:
             can be retrieved.
           type: boolean
         metadata:
-          $ref: '#/components/schemas/ServiceOfferingMetadata'
+          $ref: "#/components/schemas/ServiceOfferingMetadata"
         name:
           description: The name of the service offering.
           example: my-service-offering
@@ -3778,12 +3778,6 @@ components:
           type: string
       type: object
     ServicePlanMetadata:
-      example:
-        supportedMaxOSBVersion: "2.14"
-        supportedMinOSBVersion: "2.11"
-        supportedPlatforms:
-        - kubernetes
-        - kubernetes
       properties:
         supportedMaxOSBVersion:
           description: The latest supported OSB version.
@@ -3804,49 +3798,39 @@ components:
       type: object
     ServicePlanResponseList:
       example:
-        num_items: 1
         items:
-        - catalog_id: id1234
-          bindable: true
+        - bindable: true
+          catalog_id: id1234
           catalog_name: name1
-          metadata:
-            supportedMaxOSBVersion: "2.14"
-            supportedMinOSBVersion: "2.11"
-            supportedPlatforms:
-            - kubernetes
-            - kubernetes
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          name: my-service-plan
           created_at: 2000-01-23T04:56:07.000+00:00
           description: This service plan is on a monthly basis.
-          service_offering_id: "1234"
-          id: my-service-plan-123-id
           free: true
-        - catalog_id: id1234
-          bindable: true
-          catalog_name: name1
-          metadata:
-            supportedMaxOSBVersion: "2.14"
-            supportedMinOSBVersion: "2.11"
-            supportedPlatforms:
-            - kubernetes
-            - kubernetes
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
+          id: my-service-plan-123-id
+          metadata: {}
           name: my-service-plan
+          ready: true
+          service_offering_id: "1234"
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        - bindable: true
+          catalog_id: id1234
+          catalog_name: name1
           created_at: 2000-01-23T04:56:07.000+00:00
           description: This service plan is on a monthly basis.
-          service_offering_id: "1234"
-          id: my-service-plan-123-id
           free: true
+          id: my-service-plan-123-id
+          metadata: {}
+          name: my-service-plan
+          ready: true
+          service_offering_id: "1234"
+          updated_at: 2000-01-23T04:56:07.000+00:00
+        num_items: 1
         token: wcxdX
       properties:
         items:
           description: The list of the response objects that contain details about
             the service plans.
           items:
-            $ref: '#/components/schemas/ServicePlanResponseObject'
+            $ref: "#/components/schemas/ServicePlanResponseObject"
           type: array
         num_items:
           description: The number of service plans associated with the subaccount.
@@ -3865,23 +3849,18 @@ components:
       type: object
     ServicePlanResponseObject:
       example:
-        catalog_id: id1234
         bindable: true
+        catalog_id: id1234
         catalog_name: name1
-        metadata:
-          supportedMaxOSBVersion: "2.14"
-          supportedMinOSBVersion: "2.11"
-          supportedPlatforms:
-          - kubernetes
-          - kubernetes
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my-service-plan
         created_at: 2000-01-23T04:56:07.000+00:00
         description: This service plan is on a monthly basis.
-        service_offering_id: "1234"
-        id: my-service-plan-123-id
         free: true
+        id: my-service-plan-123-id
+        metadata: {}
+        name: my-service-plan
+        ready: true
+        service_offering_id: "1234"
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         bindable:
           description: Whether the service plan is bindable.
@@ -3911,7 +3890,8 @@ components:
           example: my-service-plan-123-id
           type: string
         metadata:
-          $ref: '#/components/schemas/ServicePlanMetadata'
+          description: The metadata associated with the service plan.
+          type: object
         name:
           description: The name of the service plan.
           example: my-service-plan
@@ -3931,9 +3911,9 @@ components:
       type: object
     TransitiveResource:
       example:
-        operation_type: operation_type
         criteria: criteria
         id: 0aba8e41-5e69-44b1-974f-83100
+        operation_type: operation_type
         type: type
       properties:
         criteria:
@@ -3954,25 +3934,25 @@ components:
     UpdateLabelsPayload:
       description: The list of labels to update for the resource.
       items:
-        $ref: '#/components/schemas/Label'
+        $ref: "#/components/schemas/Label"
       type: array
     UpdatePlatformRequestPayload:
       example:
-        name: my-platform
         description: Description goes here.
         id: my-platform-123-id
-        type: kubernetes
         labels:
-        - op: add
+        - key: label1
+          op: add
           values:
           - value1
           - value2
-          key: label1
-        - op: add
+        - key: label1
+          op: add
           values:
           - value1
           - value2
-          key: label1
+        name: my-platform
+        type: kubernetes
       properties:
         description:
           description: The description of the platform for customer-facing UIs.
@@ -3988,7 +3968,7 @@ components:
         labels:
           description: The list of labels to update for the resource.
           items:
-            $ref: '#/components/schemas/Label'
+            $ref: "#/components/schemas/Label"
           type: array
         name:
           description: "The CLI-friendly name of the platform to update.<br>A CLI-friendly\
@@ -3999,34 +3979,34 @@ components:
           example: my-platform
           type: string
         type:
-          description: 'The type of the platform.<br/><br/> Possible values:'
+          description: "The type of the platform.<br/><br/> Possible values:"
           enum:
           - kubernetes
           type: string
       type: object
     UpdateServiceInstanceRequestPayload:
       example:
+        labels:
+        - key: label1
+          op: add
+          values:
+          - value1
+          - value2
+        - key: label1
+          op: add
+          values:
+          - value1
+          - value2
         name: my-service-instance
-        service_plan_id: dsdsdsadsa98898890dasdsa
         parameters:
           parameter1: value1
           parameter2: value2
-        labels:
-        - op: add
-          values:
-          - value1
-          - value2
-          key: label1
-        - op: add
-          values:
-          - value1
-          - value2
-          key: label1
+        service_plan_id: dsdsdsadsa98898890dasdsa
       properties:
         labels:
           description: The list of labels to update for the resource.
           items:
-            $ref: '#/components/schemas/Label'
+            $ref: "#/components/schemas/Label"
           type: array
         name:
           description: The name of the service instance to update.
@@ -4051,13 +4031,9 @@ components:
       type: object
     UpdatedPlatformResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my-platform
         created_at: 2000-01-23T04:56:07.000+00:00
         description: Describe your platform here.
         id: my-platform-123-id
-        type: kubernetes
         labels:
           label1:
           - value1
@@ -4067,6 +4043,10 @@ components:
           - value1
           - value2
           - value3
+        name: my-platform
+        ready: true
+        type: kubernetes
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
         created_at:
           description: The time the platform was created. <br/>In ISO 8601 format:</br>
@@ -4119,8 +4099,11 @@ components:
       type: object
     UpdatedServiceInstanceResponseObject:
       example:
-        shared: true
+        context:
+          account: my-account
         created_at: 2000-01-23T04:56:07.000+00:00
+        dashboard_url: http://my-service-dashboard.com
+        id: my-service-instance-123-id
         labels:
           label1:
           - value1
@@ -4130,19 +4113,16 @@ components:
           - value1
           - value2
           - value3
-        referenced_instance_id: referenced_instance_id
-        usable: true
         maintenance_info:
           version: 1.0.0
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        context:
-          account: my-account
         name: my-service-instance
         platform_id: platform_id
+        ready: true
+        referenced_instance_id: referenced_instance_id
         service_plan_id: service_plan_id
-        id: my-service-instance-123-id
-        dashboard_url: http://my-service-dashboard.com
+        shared: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        usable: true
       properties:
         context:
           additionalProperties:

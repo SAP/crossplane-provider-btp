@@ -43,7 +43,10 @@ type Token struct {
 	Username *string `json:"username,omitempty"`
 	CredentialsNonExpired *bool `json:"credentialsNonExpired,omitempty"`
 	AccountNonLocked *bool `json:"accountNonLocked,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _Token Token
 
 // NewToken instantiates a new Token object
 // This constructor will assign default values to properties that have it defined,
@@ -845,7 +848,54 @@ func (o Token) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AccountNonLocked) {
 		toSerialize["accountNonLocked"] = o.AccountNonLocked
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *Token) UnmarshalJSON(data []byte) (err error) {
+	varToken := _Token{}
+
+	err = json.Unmarshal(data, &varToken)
+
+	if err != nil {
+		return err
+	}
+
+	*o = Token(varToken)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "expirationDate")
+		delete(additionalProperties, "cloneServiceInstanceId")
+		delete(additionalProperties, "givenName")
+		delete(additionalProperties, "clientId")
+		delete(additionalProperties, "subdomain")
+		delete(additionalProperties, "appToken")
+		delete(additionalProperties, "subaccountId")
+		delete(additionalProperties, "grantType")
+		delete(additionalProperties, "scopes")
+		delete(additionalProperties, "authorities")
+		delete(additionalProperties, "email")
+		delete(additionalProperties, "familyName")
+		delete(additionalProperties, "zoneId")
+		delete(additionalProperties, "logonName")
+		delete(additionalProperties, "expiration")
+		delete(additionalProperties, "origin")
+		delete(additionalProperties, "enabled")
+		delete(additionalProperties, "accountNonExpired")
+		delete(additionalProperties, "password")
+		delete(additionalProperties, "username")
+		delete(additionalProperties, "credentialsNonExpired")
+		delete(additionalProperties, "accountNonLocked")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableToken struct {

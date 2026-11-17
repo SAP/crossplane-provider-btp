@@ -19,8 +19,11 @@ var _ MappedNullable = &GetAllInstanceBindingsResponse{}
 
 // GetAllInstanceBindingsResponse The response list of all bindings for a given environment instance.
 type GetAllInstanceBindingsResponse struct {
-	Bindings []EnvironmentInstanceBindingMetadata `json:"bindings,omitempty"`
+	Bindings             []EnvironmentInstanceBindingMetadata `json:"bindings,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _GetAllInstanceBindingsResponse GetAllInstanceBindingsResponse
 
 // NewGetAllInstanceBindingsResponse instantiates a new GetAllInstanceBindingsResponse object
 // This constructor will assign default values to properties that have it defined,
@@ -72,7 +75,7 @@ func (o *GetAllInstanceBindingsResponse) SetBindings(v []EnvironmentInstanceBind
 }
 
 func (o GetAllInstanceBindingsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -84,7 +87,33 @@ func (o GetAllInstanceBindingsResponse) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.Bindings) {
 		toSerialize["bindings"] = o.Bindings
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *GetAllInstanceBindingsResponse) UnmarshalJSON(data []byte) (err error) {
+	varGetAllInstanceBindingsResponse := _GetAllInstanceBindingsResponse{}
+
+	err = json.Unmarshal(data, &varGetAllInstanceBindingsResponse)
+
+	if err != nil {
+		return err
+	}
+
+	*o = GetAllInstanceBindingsResponse(varGetAllInstanceBindingsResponse)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "bindings")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableGetAllInstanceBindingsResponse struct {
@@ -122,5 +151,3 @@ func (v *NullableGetAllInstanceBindingsResponse) UnmarshalJSON(src []byte) error
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

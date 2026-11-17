@@ -243,30 +243,35 @@ func (a *ScimGroupEndpointsAPIService) ListGroupsExecute(r ScimGroupEndpointsAPI
 		parameterAddToHeaderOrQuery(localVarQueryParams, "filter", r.filter, "form", "")
 	} else {
 		var defaultValue string = "id pr"
+		parameterAddToHeaderOrQuery(localVarQueryParams, "filter", defaultValue, "form", "")
 		r.filter = &defaultValue
 	}
 	if r.sortBy != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "sortBy", r.sortBy, "form", "")
 	} else {
 		var defaultValue string = "displayName"
+		parameterAddToHeaderOrQuery(localVarQueryParams, "sortBy", defaultValue, "form", "")
 		r.sortBy = &defaultValue
 	}
 	if r.sortOrder != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "sortOrder", r.sortOrder, "form", "")
 	} else {
 		var defaultValue string = "ascending"
+		parameterAddToHeaderOrQuery(localVarQueryParams, "sortOrder", defaultValue, "form", "")
 		r.sortOrder = &defaultValue
 	}
 	if r.startIndex != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "startIndex", r.startIndex, "form", "")
 	} else {
 		var defaultValue int32 = 1
+		parameterAddToHeaderOrQuery(localVarQueryParams, "startIndex", defaultValue, "form", "")
 		r.startIndex = &defaultValue
 	}
 	if r.count != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "count", r.count, "form", "")
 	} else {
 		var defaultValue int32 = 100
+		parameterAddToHeaderOrQuery(localVarQueryParams, "count", defaultValue, "form", "")
 		r.count = &defaultValue
 	}
 	// to determine the Content-Type header

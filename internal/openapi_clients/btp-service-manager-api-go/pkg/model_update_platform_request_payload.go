@@ -29,7 +29,10 @@ type UpdatePlatformRequestPayload struct {
 	Name *string `json:"name,omitempty"`
 	// The type of the platform.<br/><br/> Possible values:
 	Type *string `json:"type,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UpdatePlatformRequestPayload UpdatePlatformRequestPayload
 
 // NewUpdatePlatformRequestPayload instantiates a new UpdatePlatformRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -233,7 +236,37 @@ func (o UpdatePlatformRequestPayload) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UpdatePlatformRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varUpdatePlatformRequestPayload := _UpdatePlatformRequestPayload{}
+
+	err = json.Unmarshal(data, &varUpdatePlatformRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UpdatePlatformRequestPayload(varUpdatePlatformRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "type")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUpdatePlatformRequestPayload struct {

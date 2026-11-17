@@ -13,7 +13,6 @@ package openapi
 import (
 	"encoding/json"
 	"time"
-	"bytes"
 	"fmt"
 )
 
@@ -32,6 +31,7 @@ type IdentityProviderAbstractIdentityProviderDefinition struct {
 	Active *bool `json:"active,omitempty"`
 	IdentityZoneId *string `json:"identityZoneId,omitempty"`
 	LastModified *time.Time `json:"last_modified,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _IdentityProviderAbstractIdentityProviderDefinition IdentityProviderAbstractIdentityProviderDefinition
@@ -386,6 +386,11 @@ func (o IdentityProviderAbstractIdentityProviderDefinition) ToMap() (map[string]
 	if !IsNil(o.LastModified) {
 		toSerialize["last_modified"] = o.LastModified
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -415,15 +420,29 @@ func (o *IdentityProviderAbstractIdentityProviderDefinition) UnmarshalJSON(data 
 
 	varIdentityProviderAbstractIdentityProviderDefinition := _IdentityProviderAbstractIdentityProviderDefinition{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varIdentityProviderAbstractIdentityProviderDefinition)
+	err = json.Unmarshal(data, &varIdentityProviderAbstractIdentityProviderDefinition)
 
 	if err != nil {
 		return err
 	}
 
 	*o = IdentityProviderAbstractIdentityProviderDefinition(varIdentityProviderAbstractIdentityProviderDefinition)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "originKey")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "type")
+		delete(additionalProperties, "config")
+		delete(additionalProperties, "version")
+		delete(additionalProperties, "created")
+		delete(additionalProperties, "active")
+		delete(additionalProperties, "identityZoneId")
+		delete(additionalProperties, "last_modified")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

@@ -23,7 +23,10 @@ type BusinessCategoryResponseObject struct {
 	DisplayName *string `json:"displayName,omitempty"`
 	// Unique ID of the business category.
 	Id *string `json:"id,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _BusinessCategoryResponseObject BusinessCategoryResponseObject
 
 // NewBusinessCategoryResponseObject instantiates a new BusinessCategoryResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -122,7 +125,34 @@ func (o BusinessCategoryResponseObject) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *BusinessCategoryResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varBusinessCategoryResponseObject := _BusinessCategoryResponseObject{}
+
+	err = json.Unmarshal(data, &varBusinessCategoryResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = BusinessCategoryResponseObject(varBusinessCategoryResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "id")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableBusinessCategoryResponseObject struct {

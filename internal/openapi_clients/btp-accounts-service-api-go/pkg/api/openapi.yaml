@@ -2828,8 +2828,8 @@ components:
         \ We recommend transitioning to the \"labels\" field. Do not include \"customProperties\"\
         \ and \"labels\" together in the same request (customProperties will be ignored).\n"
       example:
-        value: "{}"
         key: key
+        value: {}
       properties:
         key:
           description: A name for the label up to 63 characters. Attribute is case-sensitive
@@ -2861,29 +2861,29 @@ components:
     CloneNeoSubaccountRequestPayload:
       description: Details of the new subaccount.
       example:
-        subaccountAdmins:
-        - subaccountAdmins
-        - subaccountAdmins
         betaEnabled: true
-        customProperties:
-        - value: "{}"
-          key: key
-        - value: "{}"
-          key: key
-        displayName: displayName
-        origin: API
-        parentGUID: parentGUID
-        usedForProduction: USED_FOR_PRODUCTION
-        description: description
-        subdomain: subdomain
         cloneConfigurations:
         - cloneConfigurations
         - cloneConfigurations
-        region: region
+        customProperties:
+        - key: key
+          value: {}
+        - key: key
+          value: {}
+        description: description
+        displayName: displayName
         labels:
           key:
           - labels
           - labels
+        origin: API
+        parentGUID: parentGUID
+        region: region
+        subaccountAdmins:
+        - subaccountAdmins
+        - subaccountAdmins
+        subdomain: subdomain
+        usedForProduction: USED_FOR_PRODUCTION
       properties:
         betaEnabled:
           description: "Enables the subaccount to use beta services and applications.\
@@ -3009,23 +3009,23 @@ components:
       description: Details of the directory to create.
       example:
         customProperties:
-        - value: "{}"
-          key: key
-        - value: "{}"
-          key: key
-        directoryFeatures:
-        - DEFAULT
-        - DEFAULT
-        displayName: displayName
+        - key: key
+          value: {}
+        - key: key
+          value: {}
         description: description
         directoryAdmins:
         - directoryAdmins
         - directoryAdmins
-        subdomain: subdomain
+        directoryFeatures:
+        - DEFAULT
+        - DEFAULT
+        displayName: displayName
         labels:
           key:
           - labels
           - labels
+        subdomain: subdomain
       properties:
         customProperties:
           deprecated: true
@@ -3137,7 +3137,7 @@ components:
       example:
         name: name
         parameters:
-          key: "{}"
+          key: {}
       properties:
         name:
           description: Specify the name of the service binding.
@@ -3156,26 +3156,26 @@ components:
     CreateSubaccountRequestPayload:
       description: Details of the new subaccount.
       example:
-        subaccountAdmins:
-        - subaccountAdmins
-        - subaccountAdmins
         betaEnabled: true
         customProperties:
-        - value: "{}"
-          key: key
-        - value: "{}"
-          key: key
-        displayName: displayName
-        origin: API
-        parentGUID: parentGUID
-        usedForProduction: USED_FOR_PRODUCTION
+        - key: key
+          value: {}
+        - key: key
+          value: {}
         description: description
-        subdomain: subdomain
-        region: region
+        displayName: displayName
         labels:
           key:
           - labels
           - labels
+        origin: API
+        parentGUID: parentGUID
+        region: region
+        subaccountAdmins:
+        - subaccountAdmins
+        - subaccountAdmins
+        subdomain: subdomain
+        usedForProduction: USED_FOR_PRODUCTION
       properties:
         betaEnabled:
           description: "Enables the subaccount to use beta services and applications.\
@@ -3293,26 +3293,26 @@ components:
     DataResponseObject:
       example:
         values:
-        - dynamicProperty: true
-          validationSchema:
-            key: "{}"
+        - classification: classification
           defaultValue: defaultValue
+          description: description
+          dynamicProperty: true
           entityType: entityType
           entityTypeGuid: entityTypeGuid
-          description: description
-          classification: classification
-          value: "{}"
           key: key
-        - dynamicProperty: true
           validationSchema:
-            key: "{}"
+            key: {}
+          value: {}
+        - classification: classification
           defaultValue: defaultValue
+          description: description
+          dynamicProperty: true
           entityType: entityType
           entityTypeGuid: entityTypeGuid
-          description: description
-          classification: classification
-          value: "{}"
           key: key
+          validationSchema:
+            key: {}
+          value: {}
       properties:
         values:
           description: The response object containing information about the data.
@@ -3322,96 +3322,96 @@ components:
       type: object
     DirectoryResponseObject:
       example:
+        children:
+        - null
+        - null
         contractStatus: ACTIVE
+        createdBy: createdBy
+        createdDate: 0
+        customProperties:
+        - accountGUID: accountGUID
+          key: key
+          value: value
+        - accountGUID: accountGUID
+          key: key
+          value: value
+        description: description
         directoryFeatures:
         - DEFAULT
         - DEFAULT
         displayName: displayName
-        stateMessage: stateMessage
-        description: description
+        entityState: STARTED
+        globalAccountGUID: globalAccountGUID
+        guid: guid
         labels:
           key:
           - labels
           - labels
-        createdDate: 0
-        customProperties:
-        - accountGUID: accountGUID
-          value: value
-          key: key
-        - accountGUID: accountGUID
-          value: value
-          key: key
-        globalAccountGUID: globalAccountGUID
-        children:
-        - null
-        - null
-        createdBy: createdBy
-        entityState: STARTED
-        parentGUID: parentGUID
-        modifiedDate: 6
-        guid: guid
-        subdomain: subdomain
-        subaccounts:
-        - displayName: displayName
-          stateMessage: stateMessage
-          description: description
-          technicalName: technicalName
-          labels:
-            key:
-            - labels
-            - labels
-          betaEnabled: true
-          createdDate: 1
-          customProperties:
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          globalAccountGUID: globalAccountGUID
-          createdBy: createdBy
-          parentGUID: parentGUID
-          modifiedDate: 5
-          usedForProduction: UNSET
-          guid: guid
-          subdomain: subdomain
-          parentFeatures:
-          - DEFAULT
-          - DEFAULT
-          state: STARTED
-          region: region
-        - displayName: displayName
-          stateMessage: stateMessage
-          description: description
-          technicalName: technicalName
-          labels:
-            key:
-            - labels
-            - labels
-          betaEnabled: true
-          createdDate: 1
-          customProperties:
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          globalAccountGUID: globalAccountGUID
-          createdBy: createdBy
-          parentGUID: parentGUID
-          modifiedDate: 5
-          usedForProduction: UNSET
-          guid: guid
-          subdomain: subdomain
-          parentFeatures:
-          - DEFAULT
-          - DEFAULT
-          state: STARTED
-          region: region
         legalLinks:
           privacy: privacy
+        modifiedDate: 6
+        parentGUID: parentGUID
+        stateMessage: stateMessage
+        subaccounts:
+        - betaEnabled: true
+          createdBy: createdBy
+          createdDate: 1
+          customProperties:
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          description: description
+          displayName: displayName
+          globalAccountGUID: globalAccountGUID
+          guid: guid
+          labels:
+            key:
+            - labels
+            - labels
+          modifiedDate: 5
+          parentFeatures:
+          - DEFAULT
+          - DEFAULT
+          parentGUID: parentGUID
+          region: region
+          state: STARTED
+          stateMessage: stateMessage
+          subdomain: subdomain
+          technicalName: technicalName
+          usedForProduction: UNSET
+        - betaEnabled: true
+          createdBy: createdBy
+          createdDate: 1
+          customProperties:
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          description: description
+          displayName: displayName
+          globalAccountGUID: globalAccountGUID
+          guid: guid
+          labels:
+            key:
+            - labels
+            - labels
+          modifiedDate: 5
+          parentFeatures:
+          - DEFAULT
+          - DEFAULT
+          parentGUID: parentGUID
+          region: region
+          state: STARTED
+          stateMessage: stateMessage
+          subdomain: subdomain
+          technicalName: technicalName
+          usedForProduction: UNSET
+        subdomain: subdomain
       properties:
         children:
           description: The response object containing information about the directories.
@@ -3585,10 +3585,10 @@ components:
       description: New and/or updated directory settings.
       example:
         entitySettings:
-        - value: "{}"
-          key: key
-        - value: "{}"
-          key: key
+        - key: key
+          value: {}
+        - key: key
+          value: {}
       properties:
         entitySettings:
           description: Additional properties for the settings.
@@ -3600,288 +3600,288 @@ components:
       type: object
     GlobalAccountResponseObject:
       example:
-        consumptionBased: true
-        displayName: displayName
-        bpoCustomerId: bpoCustomerId
-        origin: ORDER
         backwardCompliantEU: true
-        stateMessage: stateMessage
-        description: description
-        expiryDate: 6
-        licenseType: DEVELOPER
-        commercialModel: commercialModel
-        globalAccountGUID: globalAccountGUID
+        bpoCustomerId: bpoCustomerId
         children:
-        - contractStatus: ACTIVE
+        - children:
+          - null
+          - null
+          contractStatus: ACTIVE
+          createdBy: createdBy
+          createdDate: 0
+          customProperties:
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          description: description
           directoryFeatures:
           - DEFAULT
           - DEFAULT
           displayName: displayName
-          stateMessage: stateMessage
-          description: description
+          entityState: STARTED
+          globalAccountGUID: globalAccountGUID
+          guid: guid
           labels:
             key:
             - labels
             - labels
+          legalLinks:
+            privacy: privacy
+          modifiedDate: 6
+          parentGUID: parentGUID
+          stateMessage: stateMessage
+          subaccounts:
+          - betaEnabled: true
+            createdBy: createdBy
+            createdDate: 1
+            customProperties:
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            description: description
+            displayName: displayName
+            globalAccountGUID: globalAccountGUID
+            guid: guid
+            labels:
+              key:
+              - labels
+              - labels
+            modifiedDate: 5
+            parentFeatures:
+            - DEFAULT
+            - DEFAULT
+            parentGUID: parentGUID
+            region: region
+            state: STARTED
+            stateMessage: stateMessage
+            subdomain: subdomain
+            technicalName: technicalName
+            usedForProduction: UNSET
+          - betaEnabled: true
+            createdBy: createdBy
+            createdDate: 1
+            customProperties:
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            description: description
+            displayName: displayName
+            globalAccountGUID: globalAccountGUID
+            guid: guid
+            labels:
+              key:
+              - labels
+              - labels
+            modifiedDate: 5
+            parentFeatures:
+            - DEFAULT
+            - DEFAULT
+            parentGUID: parentGUID
+            region: region
+            state: STARTED
+            stateMessage: stateMessage
+            subdomain: subdomain
+            technicalName: technicalName
+            usedForProduction: UNSET
+          subdomain: subdomain
+        - children:
+          - null
+          - null
+          contractStatus: ACTIVE
+          createdBy: createdBy
           createdDate: 0
           customProperties:
           - accountGUID: accountGUID
-            value: value
             key: key
+            value: value
           - accountGUID: accountGUID
-            value: value
             key: key
-          globalAccountGUID: globalAccountGUID
-          children:
-          - null
-          - null
-          createdBy: createdBy
-          entityState: STARTED
-          parentGUID: parentGUID
-          modifiedDate: 6
-          guid: guid
-          subdomain: subdomain
-          subaccounts:
-          - displayName: displayName
-            stateMessage: stateMessage
-            description: description
-            technicalName: technicalName
-            labels:
-              key:
-              - labels
-              - labels
-            betaEnabled: true
-            createdDate: 1
-            customProperties:
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            globalAccountGUID: globalAccountGUID
-            createdBy: createdBy
-            parentGUID: parentGUID
-            modifiedDate: 5
-            usedForProduction: UNSET
-            guid: guid
-            subdomain: subdomain
-            parentFeatures:
-            - DEFAULT
-            - DEFAULT
-            state: STARTED
-            region: region
-          - displayName: displayName
-            stateMessage: stateMessage
-            description: description
-            technicalName: technicalName
-            labels:
-              key:
-              - labels
-              - labels
-            betaEnabled: true
-            createdDate: 1
-            customProperties:
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            globalAccountGUID: globalAccountGUID
-            createdBy: createdBy
-            parentGUID: parentGUID
-            modifiedDate: 5
-            usedForProduction: UNSET
-            guid: guid
-            subdomain: subdomain
-            parentFeatures:
-            - DEFAULT
-            - DEFAULT
-            state: STARTED
-            region: region
-          legalLinks:
-            privacy: privacy
-        - contractStatus: ACTIVE
+            value: value
+          description: description
           directoryFeatures:
           - DEFAULT
           - DEFAULT
           displayName: displayName
-          stateMessage: stateMessage
-          description: description
+          entityState: STARTED
+          globalAccountGUID: globalAccountGUID
+          guid: guid
           labels:
             key:
             - labels
             - labels
-          createdDate: 0
-          customProperties:
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          globalAccountGUID: globalAccountGUID
-          children:
-          - null
-          - null
-          createdBy: createdBy
-          entityState: STARTED
-          parentGUID: parentGUID
-          modifiedDate: 6
-          guid: guid
-          subdomain: subdomain
-          subaccounts:
-          - displayName: displayName
-            stateMessage: stateMessage
-            description: description
-            technicalName: technicalName
-            labels:
-              key:
-              - labels
-              - labels
-            betaEnabled: true
-            createdDate: 1
-            customProperties:
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            globalAccountGUID: globalAccountGUID
-            createdBy: createdBy
-            parentGUID: parentGUID
-            modifiedDate: 5
-            usedForProduction: UNSET
-            guid: guid
-            subdomain: subdomain
-            parentFeatures:
-            - DEFAULT
-            - DEFAULT
-            state: STARTED
-            region: region
-          - displayName: displayName
-            stateMessage: stateMessage
-            description: description
-            technicalName: technicalName
-            labels:
-              key:
-              - labels
-              - labels
-            betaEnabled: true
-            createdDate: 1
-            customProperties:
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            - accountGUID: accountGUID
-              value: value
-              key: key
-            globalAccountGUID: globalAccountGUID
-            createdBy: createdBy
-            parentGUID: parentGUID
-            modifiedDate: 5
-            usedForProduction: UNSET
-            guid: guid
-            subdomain: subdomain
-            parentFeatures:
-            - DEFAULT
-            - DEFAULT
-            state: STARTED
-            region: region
           legalLinks:
             privacy: privacy
-        entityState: STARTED
-        parentGUID: parentGUID
-        serviceId: serviceId
+          modifiedDate: 6
+          parentGUID: parentGUID
+          stateMessage: stateMessage
+          subaccounts:
+          - betaEnabled: true
+            createdBy: createdBy
+            createdDate: 1
+            customProperties:
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            description: description
+            displayName: displayName
+            globalAccountGUID: globalAccountGUID
+            guid: guid
+            labels:
+              key:
+              - labels
+              - labels
+            modifiedDate: 5
+            parentFeatures:
+            - DEFAULT
+            - DEFAULT
+            parentGUID: parentGUID
+            region: region
+            state: STARTED
+            stateMessage: stateMessage
+            subdomain: subdomain
+            technicalName: technicalName
+            usedForProduction: UNSET
+          - betaEnabled: true
+            createdBy: createdBy
+            createdDate: 1
+            customProperties:
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            - accountGUID: accountGUID
+              key: key
+              value: value
+            description: description
+            displayName: displayName
+            globalAccountGUID: globalAccountGUID
+            guid: guid
+            labels:
+              key:
+              - labels
+              - labels
+            modifiedDate: 5
+            parentFeatures:
+            - DEFAULT
+            - DEFAULT
+            parentGUID: parentGUID
+            region: region
+            state: STARTED
+            stateMessage: stateMessage
+            subdomain: subdomain
+            technicalName: technicalName
+            usedForProduction: UNSET
+          subdomain: subdomain
+        commercialModel: commercialModel
+        consumptionBased: true
         contractStatus: ACTIVE
-        crmTenantId: crmTenantId
         costCenter: costCenter
-        useFor: useFor
-        geoAccess: STANDARD
-        renewalDate: 5
-        terminationNotificationStatus: PENDING_FIRST_NOTIFICATION
+        costObjectId: costObjectId
         costObjectType: COST_CENTER
+        createdDate: 0
         crmCustomerId: crmCustomerId
-        parentType: ROOT
+        crmTenantId: crmTenantId
+        customProperties:
+        - accountGUID: accountGUID
+          key: key
+          value: value
+        - accountGUID: accountGUID
+          key: key
+          value: value
+        description: description
+        displayName: displayName
+        entityState: STARTED
+        expiryDate: 6
+        geoAccess: STANDARD
+        globalAccountGUID: globalAccountGUID
+        guid: guid
         labels:
           key:
           - labels
           - labels
-        createdDate: 0
-        customProperties:
-        - accountGUID: accountGUID
-          value: value
-          key: key
-        - accountGUID: accountGUID
-          value: value
-          key: key
-        modifiedDate: 1
-        guid: guid
-        subdomain: subdomain
-        subaccounts:
-        - displayName: displayName
-          stateMessage: stateMessage
-          description: description
-          technicalName: technicalName
-          labels:
-            key:
-            - labels
-            - labels
-          betaEnabled: true
-          createdDate: 1
-          customProperties:
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          globalAccountGUID: globalAccountGUID
-          createdBy: createdBy
-          parentGUID: parentGUID
-          modifiedDate: 5
-          usedForProduction: UNSET
-          guid: guid
-          subdomain: subdomain
-          parentFeatures:
-          - DEFAULT
-          - DEFAULT
-          state: STARTED
-          region: region
-        - displayName: displayName
-          stateMessage: stateMessage
-          description: description
-          technicalName: technicalName
-          labels:
-            key:
-            - labels
-            - labels
-          betaEnabled: true
-          createdDate: 1
-          customProperties:
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          globalAccountGUID: globalAccountGUID
-          createdBy: createdBy
-          parentGUID: parentGUID
-          modifiedDate: 5
-          usedForProduction: UNSET
-          guid: guid
-          subdomain: subdomain
-          parentFeatures:
-          - DEFAULT
-          - DEFAULT
-          state: STARTED
-          region: region
-        costObjectId: costObjectId
         legalLinks:
           privacy: privacy
+        licenseType: DEVELOPER
+        modifiedDate: 1
+        origin: ORDER
+        parentGUID: parentGUID
+        parentType: ROOT
+        renewalDate: 5
+        serviceId: serviceId
+        stateMessage: stateMessage
+        subaccounts:
+        - betaEnabled: true
+          createdBy: createdBy
+          createdDate: 1
+          customProperties:
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          description: description
+          displayName: displayName
+          globalAccountGUID: globalAccountGUID
+          guid: guid
+          labels:
+            key:
+            - labels
+            - labels
+          modifiedDate: 5
+          parentFeatures:
+          - DEFAULT
+          - DEFAULT
+          parentGUID: parentGUID
+          region: region
+          state: STARTED
+          stateMessage: stateMessage
+          subdomain: subdomain
+          technicalName: technicalName
+          usedForProduction: UNSET
+        - betaEnabled: true
+          createdBy: createdBy
+          createdDate: 1
+          customProperties:
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          description: description
+          displayName: displayName
+          globalAccountGUID: globalAccountGUID
+          guid: guid
+          labels:
+            key:
+            - labels
+            - labels
+          modifiedDate: 5
+          parentFeatures:
+          - DEFAULT
+          - DEFAULT
+          parentGUID: parentGUID
+          region: region
+          state: STARTED
+          stateMessage: stateMessage
+          subdomain: subdomain
+          technicalName: technicalName
+          usedForProduction: UNSET
+        subdomain: subdomain
+        terminationNotificationStatus: PENDING_FIRST_NOTIFICATION
+        useFor: useFor
       properties:
         backwardCompliantEU:
           description: Specifies if global account is backward-compliant for EU access.
@@ -4276,11 +4276,11 @@ components:
       description: Provide the parameters necessary to obtain information about the
         source and the target locations.
       example:
-        targetGuid: targetGuid
         sourceGuid: sourceGuid
         subaccountGuids:
         - subaccountGuids
         - subaccountGuids
+        targetGuid: targetGuid
       properties:
         sourceGuid:
           description: "The GUID of the current location of the subaccounts. If empty,\
@@ -4307,16 +4307,16 @@ components:
         All subaccounts must be moved to the same location.
       example:
         subaccountsToMoveCollection:
-        - targetGuid: targetGuid
-          sourceGuid: sourceGuid
+        - sourceGuid: sourceGuid
           subaccountGuids:
           - subaccountGuids
           - subaccountGuids
-        - targetGuid: targetGuid
-          sourceGuid: sourceGuid
+          targetGuid: targetGuid
+        - sourceGuid: sourceGuid
           subaccountGuids:
           - subaccountGuids
           - subaccountGuids
+          targetGuid: targetGuid
       properties:
         subaccountsToMoveCollection:
           description: Provide the parameters necessary to obtain information about
@@ -4339,16 +4339,16 @@ components:
     PropertyDataResponseObject:
       description: The response object containing information about the data.
       example:
-        dynamicProperty: true
-        validationSchema:
-          key: "{}"
+        classification: classification
         defaultValue: defaultValue
+        description: description
+        dynamicProperty: true
         entityType: entityType
         entityTypeGuid: entityTypeGuid
-        description: description
-        classification: classification
-        value: "{}"
         key: key
+        validationSchema:
+          key: {}
+        value: {}
       properties:
         classification:
           description: The sub-categories associated with the metadata definitions.
@@ -4399,8 +4399,8 @@ components:
         \ of any label key that has multiple values assigned to it."
       example:
         accountGUID: accountGUID
-        value: value
         key: key
+        value: value
       properties:
         accountGUID:
           description: The unique ID for the corresponding entity.
@@ -4419,64 +4419,64 @@ components:
     ResponseCollection:
       example:
         value:
-        - displayName: displayName
-          stateMessage: stateMessage
+        - betaEnabled: true
+          createdBy: createdBy
+          createdDate: 1
+          customProperties:
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          - accountGUID: accountGUID
+            key: key
+            value: value
           description: description
-          technicalName: technicalName
+          displayName: displayName
+          globalAccountGUID: globalAccountGUID
+          guid: guid
           labels:
             key:
             - labels
             - labels
-          betaEnabled: true
-          createdDate: 1
-          customProperties:
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          globalAccountGUID: globalAccountGUID
-          createdBy: createdBy
-          parentGUID: parentGUID
           modifiedDate: 5
-          usedForProduction: UNSET
-          guid: guid
-          subdomain: subdomain
           parentFeatures:
           - DEFAULT
           - DEFAULT
-          state: STARTED
+          parentGUID: parentGUID
           region: region
-        - displayName: displayName
+          state: STARTED
           stateMessage: stateMessage
-          description: description
+          subdomain: subdomain
           technicalName: technicalName
+          usedForProduction: UNSET
+        - betaEnabled: true
+          createdBy: createdBy
+          createdDate: 1
+          customProperties:
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          - accountGUID: accountGUID
+            key: key
+            value: value
+          description: description
+          displayName: displayName
+          globalAccountGUID: globalAccountGUID
+          guid: guid
           labels:
             key:
             - labels
             - labels
-          betaEnabled: true
-          createdDate: 1
-          customProperties:
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          - accountGUID: accountGUID
-            value: value
-            key: key
-          globalAccountGUID: globalAccountGUID
-          createdBy: createdBy
-          parentGUID: parentGUID
           modifiedDate: 5
-          usedForProduction: UNSET
-          guid: guid
-          subdomain: subdomain
           parentFeatures:
           - DEFAULT
           - DEFAULT
-          state: STARTED
+          parentGUID: parentGUID
           region: region
+          state: STARTED
+          stateMessage: stateMessage
+          subdomain: subdomain
+          technicalName: technicalName
+          usedForProduction: UNSET
       properties:
         value:
           items:
@@ -4491,16 +4491,16 @@ components:
         \ uses the mTLS credentials type contains:<br>name, clientid, certificate,\
         \ key, certUrl, sm_url, creationDate, and xsappname."
       example:
-        sm_url: sm_url
-        clientid: clientid
         certUrl: certUrl
-        xsappname: xsappname
-        clientsecret: clientsecret
         certificate: certificate
-        name: name
+        clientid: clientid
+        clientsecret: clientsecret
         creationDate: creationDate
         key: key
+        name: name
+        sm_url: sm_url
         url: url
+        xsappname: xsappname
       properties:
         certUrl:
           description: URL to fetch the token.
@@ -4544,11 +4544,11 @@ components:
         to use the Service Manager APIs in a subaccount context. The example and model
         are for the basic credentials type.
       example:
-        sm_url: sm_url
         clientid: clientid
-        xsappname: xsappname
         clientsecret: clientsecret
+        sm_url: sm_url
         url: url
+        xsappname: xsappname
       properties:
         clientid:
           description: A public identifier of the app.
@@ -4573,26 +4573,26 @@ components:
         GUID.
       example:
         items:
-        - sm_url: sm_url
-          clientid: clientid
-          certUrl: certUrl
-          xsappname: xsappname
-          clientsecret: clientsecret
+        - certUrl: certUrl
           certificate: certificate
-          name: name
+          clientid: clientid
+          clientsecret: clientsecret
           creationDate: creationDate
           key: key
-          url: url
-        - sm_url: sm_url
-          clientid: clientid
-          certUrl: certUrl
-          xsappname: xsappname
-          clientsecret: clientsecret
-          certificate: certificate
           name: name
+          sm_url: sm_url
+          url: url
+          xsappname: xsappname
+        - certUrl: certUrl
+          certificate: certificate
+          clientid: clientid
+          clientsecret: clientsecret
           creationDate: creationDate
           key: key
+          name: name
+          sm_url: sm_url
           url: url
+          xsappname: xsappname
       properties:
         items:
           items:
@@ -4601,35 +4601,35 @@ components:
       type: object
     SubaccountResponseObject:
       example:
-        displayName: displayName
-        stateMessage: stateMessage
+        betaEnabled: true
+        createdBy: createdBy
+        createdDate: 1
+        customProperties:
+        - accountGUID: accountGUID
+          key: key
+          value: value
+        - accountGUID: accountGUID
+          key: key
+          value: value
         description: description
-        technicalName: technicalName
+        displayName: displayName
+        globalAccountGUID: globalAccountGUID
+        guid: guid
         labels:
           key:
           - labels
           - labels
-        betaEnabled: true
-        createdDate: 1
-        customProperties:
-        - accountGUID: accountGUID
-          value: value
-          key: key
-        - accountGUID: accountGUID
-          value: value
-          key: key
-        globalAccountGUID: globalAccountGUID
-        createdBy: createdBy
-        parentGUID: parentGUID
         modifiedDate: 5
-        usedForProduction: UNSET
-        guid: guid
-        subdomain: subdomain
         parentFeatures:
         - DEFAULT
         - DEFAULT
-        state: STARTED
+        parentGUID: parentGUID
         region: region
+        state: STARTED
+        stateMessage: stateMessage
+        subdomain: subdomain
+        technicalName: technicalName
+        usedForProduction: UNSET
       properties:
         betaEnabled:
           description: Whether the subaccount can use beta services and applications.
@@ -4788,13 +4788,13 @@ components:
       example:
         customProperties:
         - delete: true
-          value: "{}"
           key: key
+          value: {}
         - delete: true
-          value: "{}"
           key: key
-        displayName: displayName
+          value: {}
         description: description
+        displayName: displayName
         labels:
           key:
           - labels
@@ -4876,12 +4876,12 @@ components:
       description: The request payload containing the list of features to be enabled
         in the directory.
       example:
-        directoryFeatures:
-        - DEFAULT
-        - DEFAULT
         directoryAdmins:
         - directoryAdmins
         - directoryAdmins
+        directoryFeatures:
+        - DEFAULT
+        - DEFAULT
         subdomain: subdomain
       properties:
         directoryAdmins:
@@ -4937,8 +4937,8 @@ components:
       description: "Settings as key-value pairs to assign, update, and remove from\
         \ the entity."
       example:
-        value: "{}"
         key: key
+        value: {}
       properties:
         key:
           description: A key for the property. Limited to 200 characters.
@@ -4955,13 +4955,13 @@ components:
       example:
         customProperties:
         - delete: true
-          value: "{}"
           key: key
+          value: {}
         - delete: true
-          value: "{}"
           key: key
-        displayName: displayName
+          value: {}
         description: description
+        displayName: displayName
         labels:
           key:
           - labels
@@ -5045,8 +5045,8 @@ components:
         \ remove from the entity."
       example:
         delete: true
-        value: "{}"
         key: key
+        value: {}
       properties:
         delete:
           description: Whether to delete a label according to the specified key. Omit
@@ -5072,18 +5072,18 @@ components:
         betaEnabled: true
         customProperties:
         - delete: true
-          value: "{}"
           key: key
+          value: {}
         - delete: true
-          value: "{}"
           key: key
-        displayName: displayName
-        usedForProduction: USED_FOR_PRODUCTION
+          value: {}
         description: description
+        displayName: displayName
         labels:
           key:
           - labels
           - labels
+        usedForProduction: USED_FOR_PRODUCTION
       properties:
         betaEnabled:
           description: "Enables the subaccount to use beta services and applications.\

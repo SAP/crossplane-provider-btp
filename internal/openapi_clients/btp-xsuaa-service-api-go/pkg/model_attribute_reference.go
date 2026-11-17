@@ -24,7 +24,10 @@ type AttributeReference struct {
 	DefaultValues []string `json:"default-values,omitempty"`
 	ValueType *string `json:"valueType,omitempty"`
 	Description *string `json:"description,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AttributeReference AttributeReference
 
 // NewAttributeReference instantiates a new AttributeReference object
 // This constructor will assign default values to properties that have it defined,
@@ -228,7 +231,37 @@ func (o AttributeReference) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AttributeReference) UnmarshalJSON(data []byte) (err error) {
+	varAttributeReference := _AttributeReference{}
+
+	err = json.Unmarshal(data, &varAttributeReference)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AttributeReference(varAttributeReference)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "valueRequired")
+		delete(additionalProperties, "default-values")
+		delete(additionalProperties, "valueType")
+		delete(additionalProperties, "description")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAttributeReference struct {

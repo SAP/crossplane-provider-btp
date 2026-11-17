@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -29,6 +28,7 @@ type SubaccountServicePlanRequestPayload struct {
 	Resources []ExternalResourceRequestPayload `json:"resources,omitempty"`
 	// The unique ID of the subaccount to which to assign a service plan.
 	SubaccountGUID string `json:"subaccountGUID"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _SubaccountServicePlanRequestPayload SubaccountServicePlanRequestPayload
@@ -191,6 +191,11 @@ func (o SubaccountServicePlanRequestPayload) ToMap() (map[string]interface{}, er
 		toSerialize["resources"] = o.Resources
 	}
 	toSerialize["subaccountGUID"] = o.SubaccountGUID
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -218,15 +223,23 @@ func (o *SubaccountServicePlanRequestPayload) UnmarshalJSON(data []byte) (err er
 
 	varSubaccountServicePlanRequestPayload := _SubaccountServicePlanRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varSubaccountServicePlanRequestPayload)
+	err = json.Unmarshal(data, &varSubaccountServicePlanRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = SubaccountServicePlanRequestPayload(varSubaccountServicePlanRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "amount")
+		delete(additionalProperties, "enable")
+		delete(additionalProperties, "resources")
+		delete(additionalProperties, "subaccountGUID")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

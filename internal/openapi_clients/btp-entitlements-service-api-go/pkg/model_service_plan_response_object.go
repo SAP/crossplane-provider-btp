@@ -58,7 +58,10 @@ type ServicePlanResponseObject struct {
 	// A unique identifier for service plans that can distinguish between the same service plans with different pricing plans.
 	UniqueIdentifier *string `json:"uniqueIdentifier,omitempty"`
 	Unlimited *bool `json:"unlimited,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServicePlanResponseObject ServicePlanResponseObject
 
 // NewServicePlanResponseObject instantiates a new ServicePlanResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -787,7 +790,52 @@ func (o ServicePlanResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Unlimited) {
 		toSerialize["unlimited"] = o.Unlimited
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServicePlanResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varServicePlanResponseObject := _ServicePlanResponseObject{}
+
+	err = json.Unmarshal(data, &varServicePlanResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServicePlanResponseObject(varServicePlanResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "amount")
+		delete(additionalProperties, "autoAssign")
+		delete(additionalProperties, "autoDistributeAmount")
+		delete(additionalProperties, "availableForInternal")
+		delete(additionalProperties, "beta")
+		delete(additionalProperties, "category")
+		delete(additionalProperties, "dataCenters")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "internalQuotaLimit")
+		delete(additionalProperties, "maxAllowedSubaccountQuota")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "numberOfAssignedEntities")
+		delete(additionalProperties, "providedBy")
+		delete(additionalProperties, "provisioningMethod")
+		delete(additionalProperties, "remainingAmount")
+		delete(additionalProperties, "resources")
+		delete(additionalProperties, "sourceEntitlements")
+		delete(additionalProperties, "uniqueIdentifier")
+		delete(additionalProperties, "unlimited")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServicePlanResponseObject struct {

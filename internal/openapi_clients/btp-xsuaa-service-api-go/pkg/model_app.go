@@ -37,7 +37,10 @@ type App struct {
 	RoleTemplates []RoleTemplate `json:"role-templates,omitempty"`
 	Oauth2Configuration *OAuth2Configuration `json:"oauth2-configuration,omitempty"`
 	TenantMode *string `json:"tenant-mode,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _App App
 
 // NewApp instantiates a new App object
 // This constructor will assign default values to properties that have it defined,
@@ -696,7 +699,50 @@ func (o App) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.TenantMode) {
 		toSerialize["tenant-mode"] = o.TenantMode
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *App) UnmarshalJSON(data []byte) (err error) {
+	varApp := _App{}
+
+	err = json.Unmarshal(data, &varApp)
+
+	if err != nil {
+		return err
+	}
+
+	*o = App(varApp)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "appid")
+		delete(additionalProperties, "serviceinstanceid")
+		delete(additionalProperties, "planId")
+		delete(additionalProperties, "planName")
+		delete(additionalProperties, "orgId")
+		delete(additionalProperties, "spaceId")
+		delete(additionalProperties, "userName")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "masterAppId")
+		delete(additionalProperties, "tenantId")
+		delete(additionalProperties, "xsappname")
+		delete(additionalProperties, "scopes")
+		delete(additionalProperties, "authorities")
+		delete(additionalProperties, "foreign-scope-references")
+		delete(additionalProperties, "attributes")
+		delete(additionalProperties, "role-templates")
+		delete(additionalProperties, "oauth2-configuration")
+		delete(additionalProperties, "tenant-mode")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableApp struct {

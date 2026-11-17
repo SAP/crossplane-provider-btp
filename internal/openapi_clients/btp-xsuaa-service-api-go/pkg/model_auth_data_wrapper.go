@@ -21,7 +21,10 @@ var _ MappedNullable = &AuthDataWrapper{}
 type AuthDataWrapper struct {
 	AppId *string `json:"appId,omitempty"`
 	AuthorizationData []AuthData `json:"authorizationData,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AuthDataWrapper AuthDataWrapper
 
 // NewAuthDataWrapper instantiates a new AuthDataWrapper object
 // This constructor will assign default values to properties that have it defined,
@@ -120,7 +123,34 @@ func (o AuthDataWrapper) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AuthorizationData) {
 		toSerialize["authorizationData"] = o.AuthorizationData
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AuthDataWrapper) UnmarshalJSON(data []byte) (err error) {
+	varAuthDataWrapper := _AuthDataWrapper{}
+
+	err = json.Unmarshal(data, &varAuthDataWrapper)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AuthDataWrapper(varAuthDataWrapper)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "appId")
+		delete(additionalProperties, "authorizationData")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAuthDataWrapper struct {

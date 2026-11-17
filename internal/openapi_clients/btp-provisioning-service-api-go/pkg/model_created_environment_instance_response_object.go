@@ -20,8 +20,11 @@ var _ MappedNullable = &CreatedEnvironmentInstanceResponseObject{}
 // CreatedEnvironmentInstanceResponseObject struct for CreatedEnvironmentInstanceResponseObject
 type CreatedEnvironmentInstanceResponseObject struct {
 	// ID of the created environment instance
-	Id *string `json:"id,omitempty"`
+	Id                   *string `json:"id,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _CreatedEnvironmentInstanceResponseObject CreatedEnvironmentInstanceResponseObject
 
 // NewCreatedEnvironmentInstanceResponseObject instantiates a new CreatedEnvironmentInstanceResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -73,7 +76,7 @@ func (o *CreatedEnvironmentInstanceResponseObject) SetId(v string) {
 }
 
 func (o CreatedEnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -85,7 +88,33 @@ func (o CreatedEnvironmentInstanceResponseObject) ToMap() (map[string]interface{
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *CreatedEnvironmentInstanceResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varCreatedEnvironmentInstanceResponseObject := _CreatedEnvironmentInstanceResponseObject{}
+
+	err = json.Unmarshal(data, &varCreatedEnvironmentInstanceResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = CreatedEnvironmentInstanceResponseObject(varCreatedEnvironmentInstanceResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableCreatedEnvironmentInstanceResponseObject struct {
@@ -123,5 +152,3 @@ func (v *NullableCreatedEnvironmentInstanceResponseObject) UnmarshalJSON(src []b
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -23,7 +23,10 @@ type BatchUpdateXsuaaSubscriptionDependencies struct {
 	AppProviderCustomProperties map[string]map[string]interface{} `json:"appProviderCustomProperties,omitempty"`
 	SubscriptionGuids []string `json:"subscriptionGuids,omitempty"`
 	TenantIds []string `json:"tenantIds,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _BatchUpdateXsuaaSubscriptionDependencies BatchUpdateXsuaaSubscriptionDependencies
 
 // NewBatchUpdateXsuaaSubscriptionDependencies instantiates a new BatchUpdateXsuaaSubscriptionDependencies object
 // This constructor will assign default values to properties that have it defined,
@@ -157,7 +160,35 @@ func (o BatchUpdateXsuaaSubscriptionDependencies) ToMap() (map[string]interface{
 	if !IsNil(o.TenantIds) {
 		toSerialize["tenantIds"] = o.TenantIds
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *BatchUpdateXsuaaSubscriptionDependencies) UnmarshalJSON(data []byte) (err error) {
+	varBatchUpdateXsuaaSubscriptionDependencies := _BatchUpdateXsuaaSubscriptionDependencies{}
+
+	err = json.Unmarshal(data, &varBatchUpdateXsuaaSubscriptionDependencies)
+
+	if err != nil {
+		return err
+	}
+
+	*o = BatchUpdateXsuaaSubscriptionDependencies(varBatchUpdateXsuaaSubscriptionDependencies)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "appProviderCustomProperties")
+		delete(additionalProperties, "subscriptionGuids")
+		delete(additionalProperties, "tenantIds")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableBatchUpdateXsuaaSubscriptionDependencies struct {

@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -29,6 +28,7 @@ type RoleCollection struct {
 	GroupReferences []RoleCollectionAttribute `json:"groupReferences,omitempty"`
 	SamlAttributeAssignment []RoleCollectionAttribute `json:"samlAttributeAssignment,omitempty"`
 	IsReadOnly *bool `json:"isReadOnly,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _RoleCollection RoleCollection
@@ -299,6 +299,11 @@ func (o RoleCollection) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.IsReadOnly) {
 		toSerialize["isReadOnly"] = o.IsReadOnly
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -326,15 +331,26 @@ func (o *RoleCollection) UnmarshalJSON(data []byte) (err error) {
 
 	varRoleCollection := _RoleCollection{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varRoleCollection)
+	err = json.Unmarshal(data, &varRoleCollection)
 
 	if err != nil {
 		return err
 	}
 
 	*o = RoleCollection(varRoleCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "roleReferences")
+		delete(additionalProperties, "userReferences")
+		delete(additionalProperties, "groupReferences")
+		delete(additionalProperties, "samlAttributeAssignment")
+		delete(additionalProperties, "isReadOnly")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

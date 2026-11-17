@@ -20,8 +20,11 @@ var _ MappedNullable = &LabelsResponseObject{}
 // LabelsResponseObject Labels assigned as key-value pairs to the entity.
 type LabelsResponseObject struct {
 	// User-defined labels that are assigned as key-value pairs in a JSON array to the entity.  Example: {     \"Cost Center\": [\"19700626\"],     \"Department\": [\"Sales\"],     \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],     \"EMEA\":[]  }
-	Labels map[string]interface{} `json:"labels,omitempty"`
+	Labels               map[string]interface{} `json:"labels,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _LabelsResponseObject LabelsResponseObject
 
 // NewLabelsResponseObject instantiates a new LabelsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -73,7 +76,7 @@ func (o *LabelsResponseObject) SetLabels(v map[string]interface{}) {
 }
 
 func (o LabelsResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -85,7 +88,33 @@ func (o LabelsResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Labels) {
 		toSerialize["labels"] = o.Labels
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *LabelsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varLabelsResponseObject := _LabelsResponseObject{}
+
+	err = json.Unmarshal(data, &varLabelsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = LabelsResponseObject(varLabelsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "labels")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableLabelsResponseObject struct {
@@ -123,5 +152,3 @@ func (v *NullableLabelsResponseObject) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

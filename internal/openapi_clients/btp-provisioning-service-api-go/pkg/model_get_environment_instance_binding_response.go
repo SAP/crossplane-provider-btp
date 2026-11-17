@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -34,7 +33,8 @@ type GetEnvironmentInstanceBindingResponse struct {
 	// A URL to which logs are streamed.
 	SyslogDrainUrl *string `json:"syslog_drain_url,omitempty"`
 	// An array of configurations for remote storage devices to be mounted into an application container filesystem.
-	VolumeMounts []map[string]interface{} `json:"volume_mounts,omitempty"`
+	VolumeMounts         []map[string]interface{} `json:"volume_mounts,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _GetEnvironmentInstanceBindingResponse GetEnvironmentInstanceBindingResponse
@@ -267,7 +267,7 @@ func (o *GetEnvironmentInstanceBindingResponse) SetVolumeMounts(v []map[string]i
 }
 
 func (o GetEnvironmentInstanceBindingResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -293,6 +293,11 @@ func (o GetEnvironmentInstanceBindingResponse) ToMap() (map[string]interface{}, 
 	if !IsNil(o.VolumeMounts) {
 		toSerialize["volume_mounts"] = o.VolumeMounts
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -310,10 +315,10 @@ func (o *GetEnvironmentInstanceBindingResponse) UnmarshalJSON(data []byte) (err 
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	for _, requiredProperty := range(requiredProperties) {
+	for _, requiredProperty := range requiredProperties {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -321,15 +326,26 @@ func (o *GetEnvironmentInstanceBindingResponse) UnmarshalJSON(data []byte) (err 
 
 	varGetEnvironmentInstanceBindingResponse := _GetEnvironmentInstanceBindingResponse{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varGetEnvironmentInstanceBindingResponse)
+	err = json.Unmarshal(data, &varGetEnvironmentInstanceBindingResponse)
 
 	if err != nil {
 		return err
 	}
 
 	*o = GetEnvironmentInstanceBindingResponse(varGetEnvironmentInstanceBindingResponse)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "credentials")
+		delete(additionalProperties, "endpoints")
+		delete(additionalProperties, "metadata")
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "route_service_url")
+		delete(additionalProperties, "syslog_drain_url")
+		delete(additionalProperties, "volume_mounts")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }
@@ -369,5 +385,3 @@ func (v *NullableGetEnvironmentInstanceBindingResponse) UnmarshalJSON(src []byte
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

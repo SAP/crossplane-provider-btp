@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -31,7 +30,7 @@ type CreateEnvironmentInstanceRequestPayload struct {
 	Name *string `json:"name,omitempty"`
 	// The origin of the user in case of a custom IdP configuration. This parameter is only required if the OAuth 2.0 client credentials grant flow is used, a user parameter is provided and the target environment supports custom IdP, otherwise it is ignored.
 	Origin *string `json:"origin,omitempty"`
-	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  } 
+	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  }
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	// Name of the service plan for the environment instance. Must match the name in the corresponding service broker's catalog. (for example: standard)
 	PlanName string `json:"planName"`
@@ -40,7 +39,8 @@ type CreateEnvironmentInstanceRequestPayload struct {
 	// Technical key of the corresponding environment broker.
 	TechnicalKey *string `json:"technicalKey,omitempty"`
 	// The e-mail of the user that owns the environment instance. In some environments, this user might be assigned as the initial admin of the provisioned environment. For example, for a Cloud Foundry environment, this user is assigned to the Org Manager role. This parameter is required only when OAuth 2.0 client credentials grant flow is used, otherwise it is ignored.
-	User *string `json:"user,omitempty"`
+	User                 *string `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _CreateEnvironmentInstanceRequestPayload CreateEnvironmentInstanceRequestPayload
@@ -362,7 +362,7 @@ func (o *CreateEnvironmentInstanceRequestPayload) SetUser(v string) {
 }
 
 func (o CreateEnvironmentInstanceRequestPayload) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -395,6 +395,11 @@ func (o CreateEnvironmentInstanceRequestPayload) ToMap() (map[string]interface{}
 	if !IsNil(o.User) {
 		toSerialize["user"] = o.User
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -413,10 +418,10 @@ func (o *CreateEnvironmentInstanceRequestPayload) UnmarshalJSON(data []byte) (er
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	for _, requiredProperty := range(requiredProperties) {
+	for _, requiredProperty := range requiredProperties {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -424,15 +429,29 @@ func (o *CreateEnvironmentInstanceRequestPayload) UnmarshalJSON(data []byte) (er
 
 	varCreateEnvironmentInstanceRequestPayload := _CreateEnvironmentInstanceRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varCreateEnvironmentInstanceRequestPayload)
+	err = json.Unmarshal(data, &varCreateEnvironmentInstanceRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = CreateEnvironmentInstanceRequestPayload(varCreateEnvironmentInstanceRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "environmentType")
+		delete(additionalProperties, "landscapeLabel")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "origin")
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "planName")
+		delete(additionalProperties, "serviceName")
+		delete(additionalProperties, "technicalKey")
+		delete(additionalProperties, "user")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }
@@ -472,5 +491,3 @@ func (v *NullableCreateEnvironmentInstanceRequestPayload) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

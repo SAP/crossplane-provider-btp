@@ -31,7 +31,10 @@ type AssignedServiceResponseObject struct {
 	OwnerType *string `json:"ownerType,omitempty"`
 	// List of service plans associated with the assigned service.
 	ServicePlans []AssignedServicePlanResponseObject `json:"servicePlans,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AssignedServiceResponseObject AssignedServiceResponseObject
 
 // NewAssignedServiceResponseObject instantiates a new AssignedServiceResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -305,7 +308,39 @@ func (o AssignedServiceResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.ServicePlans) {
 		toSerialize["servicePlans"] = o.ServicePlans
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AssignedServiceResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varAssignedServiceResponseObject := _AssignedServiceResponseObject{}
+
+	err = json.Unmarshal(data, &varAssignedServiceResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AssignedServiceResponseObject(varAssignedServiceResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "applicationCoordinates")
+		delete(additionalProperties, "businessCategory")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "iconBase64")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "ownerType")
+		delete(additionalProperties, "servicePlans")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAssignedServiceResponseObject struct {

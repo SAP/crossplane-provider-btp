@@ -25,7 +25,10 @@ type Name struct {
 	MiddleName *string `json:"middleName,omitempty"`
 	HonorificPrefix *string `json:"honorificPrefix,omitempty"`
 	HonorificSuffix *string `json:"honorificSuffix,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _Name Name
 
 // NewName instantiates a new Name object
 // This constructor will assign default values to properties that have it defined,
@@ -264,7 +267,38 @@ func (o Name) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.HonorificSuffix) {
 		toSerialize["honorificSuffix"] = o.HonorificSuffix
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *Name) UnmarshalJSON(data []byte) (err error) {
+	varName := _Name{}
+
+	err = json.Unmarshal(data, &varName)
+
+	if err != nil {
+		return err
+	}
+
+	*o = Name(varName)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "formatted")
+		delete(additionalProperties, "familyName")
+		delete(additionalProperties, "givenName")
+		delete(additionalProperties, "middleName")
+		delete(additionalProperties, "honorificPrefix")
+		delete(additionalProperties, "honorificSuffix")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableName struct {

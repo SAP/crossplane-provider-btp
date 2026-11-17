@@ -26,7 +26,10 @@ type UserReference struct {
 	GivenName *string `json:"givenName,omitempty"`
 	FamilyName *string `json:"familyName,omitempty"`
 	Origin *string `json:"origin,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UserReference UserReference
 
 // NewUserReference instantiates a new UserReference object
 // This constructor will assign default values to properties that have it defined,
@@ -300,7 +303,39 @@ func (o UserReference) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Origin) {
 		toSerialize["origin"] = o.Origin
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UserReference) UnmarshalJSON(data []byte) (err error) {
+	varUserReference := _UserReference{}
+
+	err = json.Unmarshal(data, &varUserReference)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UserReference(varUserReference)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "username")
+		delete(additionalProperties, "zoneId")
+		delete(additionalProperties, "email")
+		delete(additionalProperties, "givenName")
+		delete(additionalProperties, "familyName")
+		delete(additionalProperties, "origin")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUserReference struct {

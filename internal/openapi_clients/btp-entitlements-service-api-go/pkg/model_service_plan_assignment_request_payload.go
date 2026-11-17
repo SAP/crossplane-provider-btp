@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -29,6 +28,7 @@ type ServicePlanAssignmentRequestPayload struct {
 	ServicePlanName string `json:"servicePlanName"`
 	// The unique identifier of the entitlement's plan. As obtained in the GET assignments endpoint.
 	ServicePlanUniqueIdentifier *string `json:"servicePlanUniqueIdentifier,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _ServicePlanAssignmentRequestPayload ServicePlanAssignmentRequestPayload
@@ -173,6 +173,11 @@ func (o ServicePlanAssignmentRequestPayload) ToMap() (map[string]interface{}, er
 	if !IsNil(o.ServicePlanUniqueIdentifier) {
 		toSerialize["servicePlanUniqueIdentifier"] = o.ServicePlanUniqueIdentifier
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -202,15 +207,23 @@ func (o *ServicePlanAssignmentRequestPayload) UnmarshalJSON(data []byte) (err er
 
 	varServicePlanAssignmentRequestPayload := _ServicePlanAssignmentRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varServicePlanAssignmentRequestPayload)
+	err = json.Unmarshal(data, &varServicePlanAssignmentRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = ServicePlanAssignmentRequestPayload(varServicePlanAssignmentRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "assignmentInfo")
+		delete(additionalProperties, "serviceName")
+		delete(additionalProperties, "servicePlanName")
+		delete(additionalProperties, "servicePlanUniqueIdentifier")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

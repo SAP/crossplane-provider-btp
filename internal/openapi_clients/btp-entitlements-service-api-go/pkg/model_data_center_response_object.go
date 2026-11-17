@@ -39,7 +39,10 @@ type DataCenterResponseObject struct {
 	SaasRegistryServiceUrl *string `json:"saasRegistryServiceUrl,omitempty"`
 	// Whether the specified data center supports trial accounts.
 	SupportsTrial *bool `json:"supportsTrial,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _DataCenterResponseObject DataCenterResponseObject
 
 // NewDataCenterResponseObject instantiates a new DataCenterResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -418,7 +421,42 @@ func (o DataCenterResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.SupportsTrial) {
 		toSerialize["supportsTrial"] = o.SupportsTrial
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *DataCenterResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varDataCenterResponseObject := _DataCenterResponseObject{}
+
+	err = json.Unmarshal(data, &varDataCenterResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = DataCenterResponseObject(varDataCenterResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "domain")
+		delete(additionalProperties, "environment")
+		delete(additionalProperties, "iaasProvider")
+		delete(additionalProperties, "isMainDataCenter")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "provisioningServiceUrl")
+		delete(additionalProperties, "region")
+		delete(additionalProperties, "saasRegistryServiceUrl")
+		delete(additionalProperties, "supportsTrial")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableDataCenterResponseObject struct {

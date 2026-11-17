@@ -39,10 +39,6 @@ type SubaccountServiceBrokerInitParameters struct {
 	// PEM-encoded private key matching the client certificate. cert and key must be supplied together.
 	KeySecretRef *v2.SecretKeySelector `json:"keySecretRef,omitempty" tf:"-"`
 
-	// Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-	// Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-	Mtls *bool `json:"mtls,omitempty" tf:"mtls,omitempty"`
-
 	// (String) The name of the service broker.
 	// The name of the service broker.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
@@ -93,10 +89,6 @@ type SubaccountServiceBrokerObservation struct {
 	// The date and time when the resource was last modified in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.
 	LastModified *string `json:"lastModified,omitempty" tf:"last_modified,omitempty"`
 
-	// Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-	// Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-	Mtls *bool `json:"mtls,omitempty" tf:"mtls,omitempty"`
-
 	// (String) The name of the service broker.
 	// The name of the service broker.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
@@ -134,11 +126,6 @@ type SubaccountServiceBrokerParameters struct {
 	// PEM-encoded private key matching the client certificate. cert and key must be supplied together.
 	// +kubebuilder:validation:Optional
 	KeySecretRef *v2.SecretKeySelector `json:"keySecretRef,omitempty" tf:"-"`
-
-	// Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-	// Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-	// +kubebuilder:validation:Optional
-	Mtls *bool `json:"mtls,omitempty" tf:"mtls,omitempty"`
 
 	// (String) The name of the service broker.
 	// The name of the service broker.

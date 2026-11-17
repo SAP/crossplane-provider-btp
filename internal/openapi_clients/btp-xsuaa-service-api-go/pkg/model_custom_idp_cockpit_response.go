@@ -20,7 +20,10 @@ var _ MappedNullable = &CustomIdpCockpitResponse{}
 // CustomIdpCockpitResponse struct for CustomIdpCockpitResponse
 type CustomIdpCockpitResponse struct {
 	MoreTrustsAllowed *bool `json:"moreTrustsAllowed,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _CustomIdpCockpitResponse CustomIdpCockpitResponse
 
 // NewCustomIdpCockpitResponse instantiates a new CustomIdpCockpitResponse object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o CustomIdpCockpitResponse) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.MoreTrustsAllowed) {
 		toSerialize["moreTrustsAllowed"] = o.MoreTrustsAllowed
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *CustomIdpCockpitResponse) UnmarshalJSON(data []byte) (err error) {
+	varCustomIdpCockpitResponse := _CustomIdpCockpitResponse{}
+
+	err = json.Unmarshal(data, &varCustomIdpCockpitResponse)
+
+	if err != nil {
+		return err
+	}
+
+	*o = CustomIdpCockpitResponse(varCustomIdpCockpitResponse)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "moreTrustsAllowed")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableCustomIdpCockpitResponse struct {

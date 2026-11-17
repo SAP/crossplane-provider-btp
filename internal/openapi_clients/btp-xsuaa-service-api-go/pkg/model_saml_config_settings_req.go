@@ -23,7 +23,10 @@ type SamlConfigSettingsReq struct {
 	ChangeMode *string `json:"changeMode,omitempty"`
 	KeyId *string `json:"keyId,omitempty"`
 	Key *SamlKey `json:"key,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _SamlConfigSettingsReq SamlConfigSettingsReq
 
 // NewSamlConfigSettingsReq instantiates a new SamlConfigSettingsReq object
 // This constructor will assign default values to properties that have it defined,
@@ -192,7 +195,36 @@ func (o SamlConfigSettingsReq) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Key) {
 		toSerialize["key"] = o.Key
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *SamlConfigSettingsReq) UnmarshalJSON(data []byte) (err error) {
+	varSamlConfigSettingsReq := _SamlConfigSettingsReq{}
+
+	err = json.Unmarshal(data, &varSamlConfigSettingsReq)
+
+	if err != nil {
+		return err
+	}
+
+	*o = SamlConfigSettingsReq(varSamlConfigSettingsReq)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "disableInResponseToCheck")
+		delete(additionalProperties, "changeMode")
+		delete(additionalProperties, "keyId")
+		delete(additionalProperties, "key")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableSamlConfigSettingsReq struct {

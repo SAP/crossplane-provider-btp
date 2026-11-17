@@ -29,7 +29,10 @@ type RoleCollectionAttribute struct {
 	SamlEntityId *string `json:"samlEntityId,omitempty"`
 	IdpId *string `json:"idpId,omitempty"`
 	IdpDisplayName *string `json:"idpDisplayName,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RoleCollectionAttribute RoleCollectionAttribute
 
 // NewRoleCollectionAttribute instantiates a new RoleCollectionAttribute object
 // This constructor will assign default values to properties that have it defined,
@@ -408,7 +411,42 @@ func (o RoleCollectionAttribute) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.IdpDisplayName) {
 		toSerialize["idpDisplayName"] = o.IdpDisplayName
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RoleCollectionAttribute) UnmarshalJSON(data []byte) (err error) {
+	varRoleCollectionAttribute := _RoleCollectionAttribute{}
+
+	err = json.Unmarshal(data, &varRoleCollectionAttribute)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RoleCollectionAttribute(varRoleCollectionAttribute)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "roleCollectionName")
+		delete(additionalProperties, "roleCollectionIdentityZone")
+		delete(additionalProperties, "samlAttrName")
+		delete(additionalProperties, "attributeName")
+		delete(additionalProperties, "samlAttributeValue")
+		delete(additionalProperties, "attributeValue")
+		delete(additionalProperties, "comparisonOperator")
+		delete(additionalProperties, "samlEntityId")
+		delete(additionalProperties, "idpId")
+		delete(additionalProperties, "idpDisplayName")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRoleCollectionAttribute struct {

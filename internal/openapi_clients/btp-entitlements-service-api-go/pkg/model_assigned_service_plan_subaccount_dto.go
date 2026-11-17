@@ -49,7 +49,10 @@ type AssignedServicePlanSubaccountDTO struct {
 	StateMessage *string `json:"stateMessage,omitempty"`
 	// True, if an unlimited quota of this service plan assigned to the directory or subaccount in the global account. False, if the service plan is assigned to the directory or subaccount with a limited numeric quota, even if the service plan has an unlimited usage entitled on the level of the global account.
 	UnlimitedAmountAssigned *bool `json:"unlimitedAmountAssigned,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AssignedServicePlanSubaccountDTO AssignedServicePlanSubaccountDTO
 
 // NewAssignedServicePlanSubaccountDTO instantiates a new AssignedServicePlanSubaccountDTO object
 // This constructor will assign default values to properties that have it defined,
@@ -673,7 +676,49 @@ func (o AssignedServicePlanSubaccountDTO) ToMap() (map[string]interface{}, error
 	if !IsNil(o.UnlimitedAmountAssigned) {
 		toSerialize["unlimitedAmountAssigned"] = o.UnlimitedAmountAssigned
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AssignedServicePlanSubaccountDTO) UnmarshalJSON(data []byte) (err error) {
+	varAssignedServicePlanSubaccountDTO := _AssignedServicePlanSubaccountDTO{}
+
+	err = json.Unmarshal(data, &varAssignedServicePlanSubaccountDTO)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AssignedServicePlanSubaccountDTO(varAssignedServicePlanSubaccountDTO)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "amount")
+		delete(additionalProperties, "autoAssign")
+		delete(additionalProperties, "autoAssigned")
+		delete(additionalProperties, "autoDistributeAmount")
+		delete(additionalProperties, "createdDate")
+		delete(additionalProperties, "entityId")
+		delete(additionalProperties, "entityState")
+		delete(additionalProperties, "entityType")
+		delete(additionalProperties, "modifiedDate")
+		delete(additionalProperties, "parentAmount")
+		delete(additionalProperties, "parentId")
+		delete(additionalProperties, "parentRemainingAmount")
+		delete(additionalProperties, "parentType")
+		delete(additionalProperties, "requestedAmount")
+		delete(additionalProperties, "resources")
+		delete(additionalProperties, "stateMessage")
+		delete(additionalProperties, "unlimitedAmountAssigned")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAssignedServicePlanSubaccountDTO struct {

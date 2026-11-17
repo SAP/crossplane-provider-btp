@@ -22,7 +22,10 @@ type GroupVersionType struct {
 	Group *string `json:"group,omitempty"`
 	Type *string `json:"type,omitempty"`
 	Version *string `json:"version,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _GroupVersionType GroupVersionType
 
 // NewGroupVersionType instantiates a new GroupVersionType object
 // This constructor will assign default values to properties that have it defined,
@@ -156,7 +159,35 @@ func (o GroupVersionType) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Version) {
 		toSerialize["version"] = o.Version
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *GroupVersionType) UnmarshalJSON(data []byte) (err error) {
+	varGroupVersionType := _GroupVersionType{}
+
+	err = json.Unmarshal(data, &varGroupVersionType)
+
+	if err != nil {
+		return err
+	}
+
+	*o = GroupVersionType(varGroupVersionType)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "group")
+		delete(additionalProperties, "type")
+		delete(additionalProperties, "version")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableGroupVersionType struct {

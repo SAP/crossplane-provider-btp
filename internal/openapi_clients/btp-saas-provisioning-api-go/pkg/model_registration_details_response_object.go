@@ -59,7 +59,10 @@ type RegistrationDetailsResponseObject struct {
 	SpaceGuid *string `json:"spaceGuid,omitempty"`
 	// The xsappname configured in the security descriptor file used to create the xsuaa service instance for the multitenant application.
 	Xsappname *string `json:"xsappname,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RegistrationDetailsResponseObject RegistrationDetailsResponseObject
 
 // NewRegistrationDetailsResponseObject instantiates a new RegistrationDetailsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -791,7 +794,52 @@ func (o RegistrationDetailsResponseObject) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.Xsappname) {
 		toSerialize["xsappname"] = o.Xsappname
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RegistrationDetailsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varRegistrationDetailsResponseObject := _RegistrationDetailsResponseObject{}
+
+	err = json.Unmarshal(data, &varRegistrationDetailsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RegistrationDetailsResponseObject(varRegistrationDetailsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "appId")
+		delete(additionalProperties, "appName")
+		delete(additionalProperties, "appType")
+		delete(additionalProperties, "appUrls")
+		delete(additionalProperties, "automationSolutionName")
+		delete(additionalProperties, "category")
+		delete(additionalProperties, "commercialAppName")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "failSubscriptionOnAutomationFailure")
+		delete(additionalProperties, "formationSolutionName")
+		delete(additionalProperties, "globalAccountId")
+		delete(additionalProperties, "messageOnAutomationFailure")
+		delete(additionalProperties, "organizationGuid")
+		delete(additionalProperties, "paramsSchema")
+		delete(additionalProperties, "propagateParams")
+		delete(additionalProperties, "providerTenantId")
+		delete(additionalProperties, "serviceInstanceId")
+		delete(additionalProperties, "spaceGuid")
+		delete(additionalProperties, "xsappname")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRegistrationDetailsResponseObject struct {

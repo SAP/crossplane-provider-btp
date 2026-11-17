@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-	"sync/atomic"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
@@ -12,7 +11,6 @@ import (
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"github.com/crossplane/upjet/v2/pkg/controller/handler"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
-	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -35,18 +33,8 @@ const (
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
-// enableTerraformSessionReuse is configured once at startup before clients exist.
-var enableTerraformSessionReuse atomic.Bool
-
-// SetEnableTerraformSessionReuse opts into sharing configured Terraform clients.
-// Call before creating any connectors. Session reuse is disabled by default.
-func SetEnableTerraformSessionReuse(enable bool) { enableTerraformSessionReuse.Store(enable) }
-
-// frameworkProvider is initialized after startup flags and logging are configured.
-// Configure owns the reuse decision; both modes retain the integration wrapper.
-var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
-	return newBTPFrameworkProvider(enableTerraformSessionReuse.Load())
-})
+// frameworkProvider is lazy because btp.SetDebug() runs in main(), after init.
+var frameworkProvider = sync.OnceValue(newBTPFrameworkProvider)
 
 // TerraformSetupBuilder builds a terraform.SetupFn for the generated upjet
 // controllers: it resolves the ProviderConfig and tracks its usage.

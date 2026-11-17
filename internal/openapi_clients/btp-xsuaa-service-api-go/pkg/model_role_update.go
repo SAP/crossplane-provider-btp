@@ -21,7 +21,10 @@ var _ MappedNullable = &RoleUpdate{}
 type RoleUpdate struct {
 	Description *string `json:"description,omitempty"`
 	AttributeList []RoleAttribute `json:"attributeList,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RoleUpdate RoleUpdate
 
 // NewRoleUpdate instantiates a new RoleUpdate object
 // This constructor will assign default values to properties that have it defined,
@@ -120,7 +123,34 @@ func (o RoleUpdate) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AttributeList) {
 		toSerialize["attributeList"] = o.AttributeList
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RoleUpdate) UnmarshalJSON(data []byte) (err error) {
+	varRoleUpdate := _RoleUpdate{}
+
+	err = json.Unmarshal(data, &varRoleUpdate)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RoleUpdate(varRoleUpdate)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "attributeList")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRoleUpdate struct {

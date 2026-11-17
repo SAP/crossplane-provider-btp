@@ -24,7 +24,10 @@ type SearchResultsObject struct {
 	ItemsPerPage *int32 `json:"itemsPerPage,omitempty"`
 	TotalResults *int32 `json:"totalResults,omitempty"`
 	Schemas []string `json:"schemas,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _SearchResultsObject SearchResultsObject
 
 // NewSearchResultsObject instantiates a new SearchResultsObject object
 // This constructor will assign default values to properties that have it defined,
@@ -228,7 +231,37 @@ func (o SearchResultsObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Schemas) {
 		toSerialize["schemas"] = o.Schemas
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *SearchResultsObject) UnmarshalJSON(data []byte) (err error) {
+	varSearchResultsObject := _SearchResultsObject{}
+
+	err = json.Unmarshal(data, &varSearchResultsObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = SearchResultsObject(varSearchResultsObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "resources")
+		delete(additionalProperties, "startIndex")
+		delete(additionalProperties, "itemsPerPage")
+		delete(additionalProperties, "totalResults")
+		delete(additionalProperties, "schemas")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableSearchResultsObject struct {

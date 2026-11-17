@@ -42,7 +42,10 @@ type XSUser struct {
 	Version *int32 `json:"version,omitempty"`
 	Active *bool `json:"active,omitempty"`
 	RoleCollections []string `json:"roleCollections,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _XSUser XSUser
 
 // NewXSUser instantiates a new XSUser object
 // This constructor will assign default values to properties that have it defined,
@@ -841,7 +844,54 @@ func (o XSUser) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.RoleCollections) {
 		toSerialize["roleCollections"] = o.RoleCollections
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *XSUser) UnmarshalJSON(data []byte) (err error) {
+	varXSUser := _XSUser{}
+
+	err = json.Unmarshal(data, &varXSUser)
+
+	if err != nil {
+		return err
+	}
+
+	*o = XSUser(varXSUser)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "username")
+		delete(additionalProperties, "password")
+		delete(additionalProperties, "email")
+		delete(additionalProperties, "givenName")
+		delete(additionalProperties, "familyName")
+		delete(additionalProperties, "created")
+		delete(additionalProperties, "modified")
+		delete(additionalProperties, "origin")
+		delete(additionalProperties, "externalId")
+		delete(additionalProperties, "salt")
+		delete(additionalProperties, "passwordLastModified")
+		delete(additionalProperties, "phoneNumber")
+		delete(additionalProperties, "lastLogonTime")
+		delete(additionalProperties, "previousLogonTime")
+		delete(additionalProperties, "zoneId")
+		delete(additionalProperties, "verified")
+		delete(additionalProperties, "legacyVerificationBehavior")
+		delete(additionalProperties, "passwordChangeRequired")
+		delete(additionalProperties, "version")
+		delete(additionalProperties, "active")
+		delete(additionalProperties, "roleCollections")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableXSUser struct {

@@ -32,12 +32,11 @@ const (
 )
 
 // terraformProvider integrates the Terraform BTP provider with Crossplane.
-// It forwards framework capabilities and optionally reuses configured clients.
-// Its CLI transport provides request logging and evicts shared sessions on 401.
+// It caches Configure so upjet's per-reconcile ConfigureProvider RPC does not
+// log in to BTP on every reconcile (#702). Its CLI transport provides request
+// logging and evicts cached sessions on 401 so a session expiry doesn't get stuck.
 type terraformProvider struct {
 	fwprovider.Provider // forwards Metadata/Schema/Resources/DataSources
-
-	reuseSessions bool
 
 	mu      sync.Mutex
 	entries map[string]*cacheEntry
@@ -50,17 +49,16 @@ type cacheEntry struct {
 	subdomain string // globalaccount from config; eviction index
 }
 
-func newTerraformProvider(inner fwprovider.Provider, reuseSessions bool) *terraformProvider {
+func newTerraformProvider(inner fwprovider.Provider) *terraformProvider {
 	return &terraformProvider{
-		Provider:      inner,
-		reuseSessions: reuseSessions,
-		entries:       map[string]*cacheEntry{},
+		Provider: inner,
+		entries:  map[string]*cacheEntry{},
 	}
 }
 
-// newBTPFrameworkProvider always uses the integration wrapper and logging transport.
-func newBTPFrameworkProvider(reuseSessions bool) fwprovider.Provider {
-	p := newTerraformProvider(nil, reuseSessions)
+// newBTPFrameworkProvider wraps the BTP provider with the caching wrapper and logging transport.
+func newBTPFrameworkProvider() fwprovider.Provider {
+	p := newTerraformProvider(nil)
 	base := http.DefaultTransport
 	if btp.IsDebug() {
 		base = btp.DebugPrintHTTPClient().Transport
@@ -76,13 +74,6 @@ func newBTPFrameworkProvider(reuseSessions bool) fwprovider.Provider {
 }
 
 func (p *terraformProvider) Configure(ctx context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
-	if !p.reuseSessions {
-		// Terraform Configure creates a new client/session in response data.
-		// Each connector keeps its own response; nothing enters the shared cache.
-		p.Provider.Configure(ctx, req, resp)
-		return
-	}
-
 	// Raw config as key: schema-agnostic, so it can't drift when the provider
 	// adds an attribute, and it covers every field a login branches on.
 	key := fmt.Sprintf("%v", req.Config.Raw)

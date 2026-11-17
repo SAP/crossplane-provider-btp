@@ -13,7 +13,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,7 +34,6 @@ const (
 	errConnect              = "while connecting to provider"
 	errObserve              = "while observing subaccount"
 	errMigrateExternalName  = "while migrating external name"
-	errInvalidExternalName  = "external-name is not a valid GUID format"
 	errGenerateObservation  = "while generating observation"
 	errCreate               = "while creating subaccount"
 	errUpdate               = "while updating subaccount"
@@ -130,10 +128,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errMigrateExternalName)
 	}
 
-	// ADR Step 2: External-name is set, check its format (must be valid GUID)
-	if !isValidUUID(meta.GetExternalName(desiredCR)) {
-		return managed.ExternalObservation{}, errors.Wrap(errors.New(fmt.Sprintf("external-name '%s'", meta.GetExternalName(desiredCR))), errInvalidExternalName)
-	}
+	// ADR Step 2: The external-name holds the subaccount GUID. We intentionally do
+	// not validate its format here: some legacy accounts carry a non-GUID string in
+	// the external-name, and validating would break reconciliation for those resources.
 
 	// ADR Step 3: Build the Get API Request from the external-name (using GUID directly)
 	if err := c.generateObservation(ctx, desiredCR); err != nil {
@@ -495,8 +492,13 @@ func (c *external) createBTPSubaccount(
 func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
 	externalName := meta.GetExternalName(subaccount)
 
-	// if externalName is already the id, the migration can be skippped
-	if isValidUUID(externalName) {
+	// Only migrate the specific legacy convention this function exists for: the
+	// old controller never set an external-name, so it defaulted to metadata.name.
+	// Anything else (a GUID, or a legacy non-GUID value we intentionally no longer
+	// validate) is left untouched. Triggering on "not a valid GUID" instead would
+	// make every reconcile of such a resource issue a redundant GetSubaccounts call
+	// that can never find a match.
+	if externalName != subaccount.GetName() {
 		return nil
 	}
 
@@ -519,11 +521,6 @@ func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1al
 
 	return nil
 
-}
-
-func isValidUUID(s string) bool {
-	_, err := uuid.Parse(s)
-	return err == nil
 }
 
 func isRelatedAccount(subaccount *apisv1alpha1.Subaccount, account *accountclient.SubaccountResponseObject) bool {

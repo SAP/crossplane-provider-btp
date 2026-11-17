@@ -20,7 +20,10 @@ var _ MappedNullable = &RoleCollectionsBulkDto{}
 // RoleCollectionsBulkDto The role collection names to be created
 type RoleCollectionsBulkDto struct {
 	RoleCollections []RoleCollectionBasicDto `json:"roleCollections,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RoleCollectionsBulkDto RoleCollectionsBulkDto
 
 // NewRoleCollectionsBulkDto instantiates a new RoleCollectionsBulkDto object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o RoleCollectionsBulkDto) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.RoleCollections) {
 		toSerialize["roleCollections"] = o.RoleCollections
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RoleCollectionsBulkDto) UnmarshalJSON(data []byte) (err error) {
+	varRoleCollectionsBulkDto := _RoleCollectionsBulkDto{}
+
+	err = json.Unmarshal(data, &varRoleCollectionsBulkDto)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RoleCollectionsBulkDto(varRoleCollectionsBulkDto)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "roleCollections")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRoleCollectionsBulkDto struct {
