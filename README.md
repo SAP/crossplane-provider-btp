@@ -36,7 +36,7 @@ spec:
 
 Crossplane will take care to create a deployment for this provider. Once it becomes healthy, you can configure your provider using proper credentials and start orchestrating :rocket:.
 
-For workload identity authentication, see [Configure workload identity authentication](docs/end-user-guides/setup/workload-identity.md) for IAS federation, manual CIS prerequisites and Kubernetes examples.
+For technical-user or workload identity authentication, see [Authenticate the provider](docs/end-user-guides/setup/configure-provider-btp.mdx) for shared CIS prerequisites, IAS federation and Kubernetes examples.
 
 ## 👐 Support, Feedback
 If you have a question always feel free to reach out on our official crossplane slack channel: 

@@ -7,49 +7,68 @@ import TabItem from "@theme/TabItem";
 
 # Authenticate the provider
 
-This page describes how to authenticate the Crossplane BTP Provider.
-There are two approaches available: using [static user credentials](#static), or more secure [OIDC-based authentication](#oidc) setup. 
+This page describes how to authenticate the Crossplane BTP provider.
+
+Authentication requires
+
+**a central SAP Cloud Management service (CIS) binding stored in a Kubernetes Secret**.
+The service binding must be explicitely _(manual or via CLI/API)_ created **in a subaccount belonging to the same global account where you want to orchestrate your resources**.
+
+as well as a
+
+**Technical user:** store the user's static credentials in a second Secret.
+
+**OR**
+
+**IAS trusted OIDC (workload identity):** trust the control plane's OIDC issuer in IAS
+  and use a projected ServiceAccount token instead of a user password.
 
 :::tip Avoid static users
 
-Using static user credentials is simplest approach to authenticate this Provider. 
-In productive scenarios, however, we strongly recommend the more secure OIDC based approach.
+Static user credentials are the simpler option. For production, we recommend
+IAS trusted OIDC to avoid storing a long-lived user password.
 
 :::
 
-To configure the BTP provider, you need 
-The service binding must be manually created **in a subaccount belonging to the same global account where you want to orchestrate your resources**.
+The diagrams below show the shared manual subaccount containing the central CIS
+instance and service binding. Once authenticated, the provider can orchestrate
+other subaccounts and their resources in the same global account.
 
-In the diagram below, Subaccount A contains the binding for an SAP Cloud Management service instance.
-Once the provider is set up, you can orchestrate other subaccounts in code, such as Subaccount B and Subaccount C.
+<Tabs groupId="btp-authentication" defaultValue="technical-user">
+  <TabItem value="technical-user" label="Technical user">
+
+The provider uses the CIS binding Secret and a separate Secret containing the
+technical user's static credentials.
 
 :::image-light
-![Setup Cloud Management Service](/img/overview-orchestrate-accounts.png)
+![Technical-user authentication: a manual subaccount provides the central CIS binding, and the BTP provider uses static user credentials to orchestrate resources in the global account.](/img/authenticate-btp-static.png)
 :::
+
+  </TabItem>
+  <TabItem value="ias-oidc" label="IAS trusted OIDC">
+
+The provider uses the same CIS binding Secret. IAS trusts the control plane's
+OIDC issuer and maps the provider's projected ServiceAccount token to a
+passwordless workload user with BTP role assignments.
+
+:::image-light
+![IAS trusted OIDC authentication: the global account trusts IAS, and the BTP provider uses a projected ServiceAccount token alongside the central CIS binding to orchestrate resources.](/img/authenticate-btp-oidc.png)
+:::
+
+  </TabItem>
+</Tabs>
 
 ##  🚧 Prerequisites
 
-- Existing [Global Account](https://discovery-center.cloud.sap/card/3bfb0ce5-46e2-428f-b3be-5d4482322b55) on SAP BTP.
-- Running [Crossplane Provider BTP a control plane](./install-provider-btp.mdx).
+- An existing [global account](https://discovery-center.cloud.sap/card/3bfb0ce5-46e2-428f-b3be-5d4482322b55) on SAP BTP
+- [BTP provider installed on a control plane](./install-provider-btp.mdx)
 
-## Static password approach (#static)
+## Set up SAP Cloud Management service
 
-This is the **simpler, less secure approach** to authentiate this provider using
-- a **service binding of an SAP Cloud Management service** instance residing in the Global Account you want to orchestrate 
-- a **technical user** with hardcoded credentials 
+To orchestrate your global account, you need one instance of the SAP Cloud Management service (with the **central** plan) in one of your subaccounts.
+To enable API access to the service instance, you need a **service binding**.
 
-## OIDC-based approach (#oidc)
-
-This is the recommended, secure way to authenticate the provider using
-- a **service binding of an SAP Cloud Management service** instance residing in the Global Account you want to orchestrate 
-- a **technical user** with hardcoded credentials 
-
-### Set up the SAP Cloud Management service
-
-To orchestrate your global account, you need one instance of the SAP Cloud Management service (with the **central** plan) in one of your subaccounts. 
-To allow API access to the service instance, you need a **service binding**.
-
-To learn how to set up the SAP Cloud Management service, choose your preferred tool from the tabs below.
+The following steps create a `client_credentials` binding, which is supported by both approaches.
 
 <Tabs>
   <TabItem value="bpt-cli" label="Using the btp CLI">
@@ -177,9 +196,11 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
   </TabItem>
 </Tabs>
 
-## Create a `Secret` for the SAP Cloud Management service
+### Create `Secret`: CIS
 
-To allow Crossplane to communicate with the SAP Cloud Management service, you need to create a Kubernetes secret that references the service binding credentials.
+For **both authentication approaches**, create a Kubernetes Secret containing the
+service binding credentials. Both `ProviderConfig` examples below reference this
+same `cis-provider-secret`, using namespace `default` and key `data`.
 
 <Tabs>
   <TabItem value="programmatically" label="Using the CLI">
@@ -200,7 +221,7 @@ To allow Crossplane to communicate with the SAP Cloud Management service, you ne
   <TabItem value="manually" label="Manually">
  1. Copy the following YAML content and replace the value of `stringData.data` with the credentials from your SAP Cloud Management service binding.
 
-      - If you followed the steps in [Set up the SAP Cloud Management service](#set-up-the-sap-cloud-management-service), the binding credentials should already be copied to your clipboard.<br/>
+      - If you followed the steps in [Set up SAP Cloud Management service](#set-up-sap-cloud-management-service), the binding credentials should already be copied to your clipboard.<br/>
       <br/>
 
       ```yaml title="examples/provider/cis-provider-secret.yaml" {9-41}
@@ -258,7 +279,14 @@ To allow Crossplane to communicate with the SAP Cloud Management service, you ne
   </TabItem>
 </Tabs>
 
-### Create and validate a technical user
+## Set up authentication
+
+Choose one approach. The selection is shared with the `ProviderConfig` tabs below.
+
+<Tabs groupId="btp-authentication" defaultValue="technical-user">
+  <TabItem value="technical-user" label="Technical user">
+
+### Create a technical user
 
 To allow Crossplane to communicate with the BTP API, we also need a technical user to be created on BTP.
 It's important that this technical user has admin rights to the subaccount so that Crossplane can be able to create and manage resources.
@@ -303,9 +331,9 @@ They are typically granted specific permissions tailored to the tasks they need 
       Overview** of the global account under heading **Global Account: ...** or under **Switch Global Account**
 
 
-### Create a `Secret` for the technical user
+###  Create `Secret`: technical user
 
-You can create a `Secret` using the technical user (P-user) credentials.
+You can create a `Secret` using the technical user _(P-user)_ credentials.
 
 1. Save the following YAML content to `sa-provider-secret.yaml`.
 
@@ -343,42 +371,304 @@ You can create a `Secret` using the technical user (P-user) credentials.
     kubectl apply -f sa-provider-secret.yaml
     ```
 
-## Create a `ProviderConfig`
+  </TabItem>
+  <TabItem value="ias-oidc" label="IAS trusted OIDC">
 
-In the `ProviderConfig`, you'll reference the Kubernetes secrets created in [Create a `Secret` for the SAP Cloud Management service](#create-a-secret-for-the-sap-cloud-management-service) and [Create a `Secret` for the technical user](#create-a-secret-for-the-technical-user). To create the `ProviderConfig`, follow the steps below.
+You will create a passwordless IAS user, trust the control plane's tokens, grant
+the user BTP permissions, and mount a token into the provider.
 
-1. Save the following YAML content to `config.yaml`:
-    <br/>
+This guide uses **OIDC workload identity for CLI/Cloud Foundry authentication**
+and the existing **`client_credentials` CIS binding for direct CIS API calls**.
+Those CIS calls use the service client's permissions, not the workload user's
+BTP roles. No additional IAS consumer application or API dependency is needed.
 
-    ```yaml title="config.yaml" {6}
-    apiVersion: btp.sap.crossplane.io/v1alpha1
-    kind: ProviderConfig
+### OIDC prerequisites and values to collect
+
+#### Issuer URL
+
+IAS uses the control plane's **ServiceAccount issuer URL** to verify the provider's
+projected token.
+
+<Tabs defaultValue="controlplane">
+  <TabItem value="controlplane" label="ControlPlane">
+
+Find the entry named `service-account-issuer` in `status.endpoints` and copy its `url`:
+
+```yaml {7}
+apiVersion: core.open-control-plane.io/v2alpha1
+kind: ControlPlane
+# Other fields omitted
+status:
+  endpoints:
+    - name: service-account-issuer
+      url: https://discovery.example.com/projects/EXAMPLE_PROJECT/shoots/EXAMPLE_SHOOT_ID/issuer
+  # Other status fields omitted
+```
+
+  </TabItem>
+  <TabItem value="managedcontrolplane" label="ManagedControlPlane (deprecated)">
+
+For the deprecated resource, copy `status.components.apiServer.serviceAccountIssuer`:
+
+```yaml {7}
+apiVersion: core.openmcp.cloud/v1alpha1
+kind: ManagedControlPlane
+# Other fields omitted
+status:
+  components:
+    apiServer:
+      serviceAccountIssuer: https://discovery.example.com/projects/EXAMPLE_PROJECT/shoots/EXAMPLE_SHOOT_ID/issuer
+    # Other components omitted
+  # Other status fields omitted
+```
+
+  </TabItem>
+</Tabs>
+
+Record this URL as `CLUSTER_ISSUER`. Open its discovery document at
+`CLUSTER_ISSUER/.well-known/openid-configuration` and collect the document's
+`jwks_uri` as `CLUSTER_JWKS_URI`. Verify that the document's `issuer` matches
+`CLUSTER_ISSUER` exactly. IAS needs access to both the discovery URL and `jwks_uri`.
+
+This is the issuer for **ServiceAccount tokens**, not the OIDC provider used for
+human login to the control plane, and not the IAS issuer (`IAS_ISSUER`).
+
+Record the exact `issuer` from your IAS tenant's OIDC discovery document as
+`IAS_ISSUER`; use it as the projected token's audience in step 4.
+
+### 1. Create the workload user in IAS
+
+1. In the IAS administration console, open **Users & Authorizations → User Management**
+   and add a user.
+2. Set **Email** and **Login Name** to `WORKLOAD_EMAIL`. Choose **Set status active**
+   without a password or activation email, and User Type **None** where available.
+3. Under **Groups**, create a dedicated workload group and add only this user.
+
+### 2. Trust the control plane in IAS
+
+1. Open **Identity Providers → Corporate Identity Providers** and create an
+   **OpenID Connect Compliant** provider for your control plane.
+2. Open **Trust → OpenID Connect Configuration**, enter
+   `CLUSTER_ISSUER/.well-known/openid-configuration`, select **Load**, then **Save**.
+   Check that the loaded issuer and JWKS URI match the values collected above.
+3. Open **Identity Federation**. Enable **Use Identity Authentication user store**
+   and **Allow Identity Authentication users only**. Under **Assigned User Groups**,
+   select the dedicated group from step 1. Keep **Forward All SSO Requests to Corporate
+   IdP** off so human administration login still works.
+4. Open **Trust → Enriched Token Claims** and map **NameID** to `WORKLOAD_EMAIL`.
+   For a ServiceAccount-based naming scheme, use:
+
+   ```text
+   ${"kubernetes.io".serviceaccount.name}@${"kubernetes.io".namespace}.workload.example.com
+   ```
+
+   Replace the fixed suffix with your chosen cluster-specific suffix, but retain
+   the `${...}` expressions and quotes. The result must equal the IAS user's Email
+   and Login Name. Keep outgoing `mail` mapped to **Email**.
+5. Save the settings. Restrict who can run pods as the provider ServiceAccount or
+   request its tokens; the example mapping identifies it by name, not UID.
+
+### 3. Connect IAS to the BTP global account
+
+1. In the **BTP global-account cockpit**, open **Security → Trust Configuration**
+   and establish platform trust with your IAS tenant. Reuse an existing trust
+   for this global-account/IAS pair instead of creating a duplicate.
+2. Record its **Origin Key** as `BTP_ORIGIN` (platform origins end in `-platform`).
+   Check that the target subaccounts inherit this trust; application-only trust
+   in a subaccount is not enough.
+3. Under **Security → Role Collections**, assign the workload user's required roles,
+   selecting the **IAS identity provider** and `WORKLOAD_EMAIL`. Assign roles in
+   the global account and target subaccounts as needed. **Global Account Administrator**
+   and **Subaccount Administrator** are broad examples, not minimum requirements.
+4. Return to IAS: **Applications & Resources → Applications → Bundled Applications →
+   SAP Business Technology Platform**. Use the application associated with this
+   platform trust.
+5. Open **Trust → Trust Corporate Identity Providers → Edit**, select your cluster
+   IdP, keep **Allow logon with all configured corporate identity providers** off,
+   and **Save**.
+
+Trust and role assignments are both required; BTP role assignment does not create
+the IAS user from step 1.
+
+If assigning roles through the CLI instead, include `--of-idp BTP_ORIGIN` to select
+the same IAS identity. CF operations also require the appropriate CF roles/origin.
+
+### 4. Mount the provider's token
+
+On the **provider's control plane**, save the following as `runtime-config.yaml`.
+Replace `IAS_ISSUER`, the ServiceAccount name and `WORKLOAD_IDENTITY_VERSION` with
+your own values. The ServiceAccount must match the NameID mapping above.
+
+```yaml title="runtime-config.yaml"
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-btp-workload
+spec:
+  serviceAccountTemplate:
     metadata:
-        name: account-provider-config
+      name: provider-btp
+  deploymentTemplate:
     spec:
-        globalAccount: <global-account-subdomain>
-        cliServerUrl: https://cli.btp.cloud.sap
-        cisCredentials:
-            secretRef:
-                name: cis-provider-secret
-                namespace: default
-                key: data
-            source: Secret
-        serviceAccountSecret:
-            secretRef:
-                key: credentials
-                name: sa-provider-secret
-                namespace: default
-            source: Secret
-    ```
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              volumeMounts:
+                - name: workload-assertion
+                  mountPath: /var/run/secrets/workload
+                  readOnly: true
+          volumes:
+            - name: workload-assertion
+              projected:
+                sources:
+                  - serviceAccountToken:
+                      audience: IAS_ISSUER
+                      expirationSeconds: 600
+                      path: token
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-btp
+spec:
+  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:WORKLOAD_IDENTITY_VERSION
+  runtimeConfigRef:
+    name: provider-btp-workload
+```
 
-    Replace `<global-account-subdomain>` with the subdomain of your BTP global account. It must be the same global account whose subaccount holds the Cloud Management service binding referenced in `cisCredentials`.
+Preserve existing runtime settings and the Kubernetes API token when adapting
+your installation. Mount the additional token's directory without `subPath` so
+rotation remains visible. For an operator-managed installation, update its owning
+configuration rather than overwriting generated resources.
 
-2. Apply the configuration:
+```sh title="Run in Terminal"
+kubectl apply -f runtime-config.yaml
+```
 
-    ```sh title="Run in Terminal"
-    kubectl apply -f config.yaml
-    ```
+Before continuing, confirm the provider is healthy, its CRD includes
+`spec.workloadIdentity`, and the runtime has the intended ServiceAccount and token
+mount. Then use the **IAS trusted OIDC** `ProviderConfig` tab below.
+
+  </TabItem>
+</Tabs>
+
+## Create `ProviderConfig`
+
+We now have everything in place to create the `ProviderConfig`.
+
+<Tabs groupId="btp-authentication" defaultValue="technical-user">
+  <TabItem value="technical-user" label="Technical user">
+
+Reference the CIS binding Secret and the technical-user credentials Secret.
+
+```yaml title="config.yaml" {6}
+apiVersion: btp.sap.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: account-provider-config
+spec:
+  globalAccount: <global-account-subdomain>
+  cliServerUrl: https://cli.btp.cloud.sap
+  cisCredentials:
+    source: Secret
+    secretRef:
+      name: cis-provider-secret
+      namespace: default
+      key: data
+  serviceAccountSecret:
+    source: Secret
+    secretRef:
+      name: sa-provider-secret
+      namespace: default
+      key: credentials
+```
+
+Replace `<global-account-subdomain>` with the subdomain of your BTP global account.
+It must be the same global account whose subaccount holds the Cloud Management
+service binding referenced in `cisCredentials`. Adjust `cliServerUrl` if your
+landscape uses a different CLI server URL.
+
+  </TabItem>
+  <TabItem value="ias-oidc" label="IAS trusted OIDC">
+
+Reference the same CIS binding Secret and configure the projected workload token.
+Do **not** set `serviceAccountSecret`; workload mode rejects mixed password inputs.
+The CIS binding must use `client_credentials`, as created in the shared setup.
+
+```yaml title="config.yaml"
+apiVersion: btp.sap.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: account-provider-config
+spec:
+  globalAccount: GA_SUBDOMAIN
+  cliServerUrl: "https://cli.btp.cloud.sap"
+  cisCredentials:
+    source: Secret
+    secretRef:
+      namespace: default
+      name: cis-provider-secret
+      key: data
+  workloadIdentity:
+    tokenFile: /var/run/secrets/workload/token
+    identityProvider: BTP_ORIGIN
+    userEmail: WORKLOAD_EMAIL
+```
+
+Replace `GA_SUBDOMAIN` with the subdomain of the global account containing your
+CIS binding. Adjust `cliServerUrl` if your landscape uses a different CLI server.
+Use the exact `BTP_ORIGIN` and `WORKLOAD_EMAIL` from
+the IAS/BTP setup. The `tokenFile` path must match the runtime mount from step 4.
+
+This configuration needs only `tokenFile`, `identityProvider` and `userEmail`
+under `workloadIdentity`. Keep the CIS binding Secret; no user password or IAS
+client secret is added.
+
+
+<details>
+<summary>Additional resource prerequisites and operational notes</summary>
+
+### Environment resources
+
+The central CIS Secret configures the provider's account APIs. Native environment
+resources additionally need a **local** CIS binding in their target subaccount,
+using `client_credentials` for this setup, with its binding JSON available under
+`__raw` in their Cloud Management Secret.
+This is a separate resource prerequisite; OIDC does not create or replace these bindings.
+
+### Use the workload email for Subaccount administrators
+
+When [creating a Subaccount](../account/subaccount.mdx), use the chosen
+`WORKLOAD_EMAIL` in `subaccountAdmins`, rather than the raw Kubernetes subject:
+
+```yaml
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  name: my-subaccount
+spec:
+  providerConfigRef:
+    name: account-provider-config
+  forProvider:
+    displayName: My subaccount
+    region: BTP_REGION
+    subdomain: UNIQUE_SUBDOMAIN
+    subaccountAdmins:
+      - WORKLOAD_EMAIL
+```
+
+</details>
+
+  </TabItem>
+</Tabs>
+
+Apply the configuration for your chosen approach:
+
+```sh title="Run in Terminal"
+kubectl apply -f config.yaml
+```
 
 To learn more about the BTP provider or to extend its functionality, go to [the GitHub repo for the BTP provider](https://github.com/SAP/crossplane-provider-btp).
 
@@ -387,7 +677,12 @@ To learn more about the BTP provider or to extend its functionality, go to [the 
 
 ## ⁉ FAQs
 
-No FAQs yet. Got a question? [Open a GitHub issue](https://github.com/SAP/crossplane-provider-btp/issues/new/choose) and help us build this section.
+- **Do I need to restart the provider when changing the workload identity?** Yes—after
+  changing the issuer, ServiceAccount subject, audience, or IAS/BTP identity mapping.
+  Update IAS trust, BTP role assignments and `ProviderConfig` together before restarting.
+  Normal token rotation for the same identity does **not** require a restart.
+
+Got another question? [Open a GitHub issue](https://github.com/SAP/crossplane-provider-btp/issues/new/choose).
 
 For more ways to reach us, see [👐 Support, Feedback](https://github.com/SAP/crossplane-provider-btp#-support-feedback).
 
@@ -396,3 +691,7 @@ For more ways to reach us, see [👐 Support, Feedback](https://github.com/SAP/c
 - [Account Administration Using APIs of the SAP Cloud Management Service](https://help.sap.com/docs/btp/sap-business-technology-platform/account-administration-using-apis-of-sap-cloud-management-service?locale=en-US&version=LATEST)
 - [Service Instances](https://help.sap.com/docs/service-manager/sap-service-manager/service-instances?locale=en-US&version=LATEST) and [Service Bindings](https://help.sap.com/docs/service-manager/sap-service-manager/service-bindings?locale=en-US&version=LATEST)
 - [Basic Platform Concepts](https://help.sap.com/docs/btp/sap-business-technology-platform/btp-basic-platform-concepts?locale=en-US&version=LATEST)
+- [BTP platform trust and federation](https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers)
+- [CIS service plans](https://help.sap.com/docs/btp/sap-business-technology-platform/a508b724bf6d457ca7ac024b8e4b8457.html)
+- [IAS NameID claim enrichment](https://help.sap.com/docs/identity-authentication/identity-authentication/enrich-token-claims-coming-from-corporate-idp)
+- [Contributor authentication and cache notes](../../contribution-notes/workload-identity.md)

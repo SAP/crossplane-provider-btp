@@ -1,7 +1,7 @@
 # Workload identity authentication
 
 For the complete IAS, BTP, manual CIS and Kubernetes setup procedure, see the
-[end-user workload identity guide](../end-user-guides/setup/workload-identity.md).
+[end-user provider authentication guide](../end-user-guides/setup/configure-provider-btp.mdx#set-up-authentication).
 
 This opt-in mode replaces the provider user's email/password authentication with a
 rotating projected ServiceAccount assertion. CIS instances and bindings remain
