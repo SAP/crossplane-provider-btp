@@ -597,14 +597,6 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
   --kind subaccount,cloudfoundry-environment \
   --resolve-references \
   -o output.yaml
-
-# Export a directory subtree as CRs: the directory and its sub-directories plus
-# every descendant subaccount, with the hierarchy resolved via references
-go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
-  --kind subaccount,directory \
-  --subaccount <directory-guid> \
-  --resolve-references \
-  -o output.yaml
 ```
 
 ### Output to File
