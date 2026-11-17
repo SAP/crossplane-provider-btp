@@ -5,13 +5,20 @@ sidebar_position: 2
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-# Configure the provider
+# Authenticate the provider
 
-This page describes the existing password-based setup. For the opt-in projected
-ServiceAccount authentication option, including IAS configuration and manual CIS
-prerequisites, use [Configure workload identity authentication](./workload-identity.md).
+This page describes how to authenticate the Crossplane BTP Provider.
+There are two approaches available: using [static user credentials](#static), or more secure [OIDC-based authentication](#oidc) setup. 
 
-To configure the BTP provider, you need **a service binding for an SAP Cloud Management service instance**. The service binding must be manually created **in a subaccount belonging to the same global account where you want to orchestrate your resources**.
+:::tip Avoid static users
+
+Using static user credentials is simplest approach to authenticate this Provider. 
+In productive scenarios, however, we strongly recommend the more secure OIDC based approach.
+
+:::
+
+To configure the BTP provider, you need 
+The service binding must be manually created **in a subaccount belonging to the same global account where you want to orchestrate your resources**.
 
 In the diagram below, Subaccount A contains the binding for an SAP Cloud Management service instance.
 Once the provider is set up, you can orchestrate other subaccounts in code, such as Subaccount B and Subaccount C.
@@ -22,23 +29,25 @@ Once the provider is set up, you can orchestrate other subaccounts in code, such
 
 ##  🚧 Prerequisites
 
-- Your organization has a global account on SAP BTP.
-- You've [installed the BTP provider on your control plane](./install-provider-btp.mdx).
-- You're connected to your control plane.
+- Existing [Global Account](https://discovery-center.cloud.sap/card/3bfb0ce5-46e2-428f-b3be-5d4482322b55) on SAP BTP.
+- Running [Crossplane Provider BTP a control plane](./install-provider-btp.mdx).
 
-## Set up the SAP Cloud Management service
+## Static password approach (#static)
 
-To orchestrate your global account, you need one instance of the SAP Cloud Management service (with the **central** plan) in one of your subaccounts. To allow API access to the service instance, you also need a **service binding**.
+This is the **simpler, less secure approach** to authentiate this provider using
+- a **service binding of an SAP Cloud Management service** instance residing in the Global Account you want to orchestrate 
+- a **technical user** with hardcoded credentials 
 
-:::info Learn more
+## OIDC-based approach (#oidc)
 
-For more information on the SAP Cloud Management service, see [Account Administration Using APIs of the SAP Cloud Management Service](https://help.sap.com/docs/btp/sap-business-technology-platform/account-administration-using-apis-of-sap-cloud-management-service?locale=en-US&version=LATEST).
+This is the recommended, secure way to authenticate the provider using
+- a **service binding of an SAP Cloud Management service** instance residing in the Global Account you want to orchestrate 
+- a **technical user** with hardcoded credentials 
 
-For more information on service instances and bindings, see [Service Instances](https://help.sap.com/docs/service-manager/sap-service-manager/service-instances?locale=en-US&version=LATEST) and [Service Bindings](https://help.sap.com/docs/service-manager/sap-service-manager/service-bindings?locale=en-US&version=LATEST).
+### Set up the SAP Cloud Management service
 
-For more information on the BTP platform, see [Basic Platform Concepts](https://help.sap.com/docs/btp/sap-business-technology-platform/btp-basic-platform-concepts?locale=en-US&version=LATEST).
-
-:::
+To orchestrate your global account, you need one instance of the SAP Cloud Management service (with the **central** plan) in one of your subaccounts. 
+To allow API access to the service instance, you need a **service binding**.
 
 To learn how to set up the SAP Cloud Management service, choose your preferred tool from the tabs below.
 
@@ -249,7 +258,7 @@ To allow Crossplane to communicate with the SAP Cloud Management service, you ne
   </TabItem>
 </Tabs>
 
-## Create and validate a technical user
+### Create and validate a technical user
 
 To allow Crossplane to communicate with the BTP API, we also need a technical user to be created on BTP.
 It's important that this technical user has admin rights to the subaccount so that Crossplane can be able to create and manage resources.
@@ -257,7 +266,7 @@ It's important that this technical user has admin rights to the subaccount so th
 A technical user is a non-human user account created specifically for programmatic access to systems, services, or applications. Unlike regular user accounts, technical users are intended to be used by automated processes and tools rather than individuals.
 They are typically granted specific permissions tailored to the tasks they need to perform. It's a good practice to use a technical user for configuring the BTP subaccount instead of individual IDs.
 
-### Validate the technical user
+#### Validate the technical user
 
 1. Once the technical user is created, please add it to the global account and the subaccount with admin privilege as described in the SAP Help Portal: [Assign User Groups to Role Collections](https://help.sap.com/docs/btp/sap-business-technology-platform/assign-user-groups-to-role-collections?locale=en-US&version=LATEST).
 
@@ -294,7 +303,7 @@ They are typically granted specific permissions tailored to the tasks they need 
       Overview** of the global account under heading **Global Account: ...** or under **Switch Global Account**
 
 
-## Create a `Secret` for the technical user
+### Create a `Secret` for the technical user
 
 You can create a `Secret` using the technical user (P-user) credentials.
 
@@ -381,3 +390,9 @@ To learn more about the BTP provider or to extend its functionality, go to [the 
 No FAQs yet. Got a question? [Open a GitHub issue](https://github.com/SAP/crossplane-provider-btp/issues/new/choose) and help us build this section.
 
 For more ways to reach us, see [👐 Support, Feedback](https://github.com/SAP/crossplane-provider-btp#-support-feedback).
+
+## Related reading
+
+- [Account Administration Using APIs of the SAP Cloud Management Service](https://help.sap.com/docs/btp/sap-business-technology-platform/account-administration-using-apis-of-sap-cloud-management-service?locale=en-US&version=LATEST)
+- [Service Instances](https://help.sap.com/docs/service-manager/sap-service-manager/service-instances?locale=en-US&version=LATEST) and [Service Bindings](https://help.sap.com/docs/service-manager/sap-service-manager/service-bindings?locale=en-US&version=LATEST)
+- [Basic Platform Concepts](https://help.sap.com/docs/btp/sap-business-technology-platform/btp-basic-platform-concepts?locale=en-US&version=LATEST)

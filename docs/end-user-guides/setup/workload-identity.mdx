@@ -4,16 +4,14 @@ sidebar_position: 3
 
 # Configure workload identity authentication
 
-Use workload identity authentication to replace the BTP provider user's long-lived email/password
-with a rotating Kubernetes ServiceAccount JWT. IAS maps the workload to a
-passwordless user. The provider uses that identity for Terraform/CLI and Cloud
+
+
+IAS maps the workload to a passwordless user. The provider uses that identity for Terraform/CLI and Cloud
 Foundry authentication. Native Cloud Management Service (CIS) calls can use either
 an independent service-client token or a federated user token.
 
 ## Prerequisites and values to collect
 
-- A provider version containing the `workloadIdentity` feature and its CRD fields.
-  Earlier provider versions may not support these fields; verify the installed CRD.
 - A Crossplane control plane whose provider ServiceAccount tokens have an OIDC
   issuer and public HTTPS discovery/JWKS endpoints reachable by IAS.
 - A BTP global account and a **central CIS binding stored in a Kubernetes Secret**.
@@ -29,28 +27,6 @@ an independent service-client token or a federated user token.
 - BTP administration rights for trust, role assignments, entitlements and manual
   service instance/binding creation.
 
-Use this value map throughout the guide. Uppercase placeholders must be replaced
-before applying manifests.
-
-| Value | Meaning and source |
-|---|---|
-| `GA_SUBDOMAIN` | Global account subdomain from BTP account overview; not necessarily its UUID |
-| `BTP_CLI_URL` | CLI server for the BTP landscape, e.g. `https://cli.btp.cloud.sap` |
-| `IAS_ISSUER` | Exact `issuer` in IAS `/.well-known/openid-configuration` |
-| `IAS_TOKEN_BASE_URL` | Host/base URL serving IAS `/oauth2/token`, without that suffix |
-| `CLUSTER_ISSUER`, `CLUSTER_JWKS_URI` | Values returned by the cluster discovery document |
-| `PROVIDER_NAMESPACE` | Namespace in which Crossplane runs the provider, e.g. `crossplane-system` |
-| `SERVICEACCOUNT_NAME` | Explicit provider runtime ServiceAccount name, e.g. `provider-btp` |
-| `IDENTITY_SUFFIX` | Fixed suffix used by this guide's example naming scheme, e.g. `workload.example.com` |
-| `WORKLOAD_EMAIL` | Chosen IAS/BTP workload email; this guide uses `SERVICEACCOUNT_NAME@PROVIDER_NAMESPACE.IDENTITY_SUFFIX` as an example |
-| `BTP_ORIGIN` | Exact BTP platform trust origin, e.g. `workload-platform` |
-| `IAS_CONSUMER_CLIENT_ID` | Generated client ID of the confidential consumer created in step 3 |
-| `DEPENDENCY_NAME` | Saved consumer dependency name, e.g. `btp-principal-propagation` |
-
-Read both discovery documents and record issuer/JWKS/token endpoint values. An
-IAS administration domain alias can differ from its advertised issuer: use
-`IAS_ISSUER` for the projected token audience and the token endpoint's base for
-`iasUrl`. Preserve exact scheme, path and trailing slash.
 
 ## 1. Prepare the IAS user and cluster trust
 
