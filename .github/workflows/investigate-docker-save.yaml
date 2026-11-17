@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - investigate-upgrade-test-error
+  pull_request:
+    branches:
+      - main
 
 jobs:
   investigate:
