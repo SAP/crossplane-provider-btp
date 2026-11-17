@@ -34,27 +34,39 @@ jobs:
 
           F=/tmp/xp-testing/internal/xpkg/xpkg.go
 
-          # Add debug print before daemon.Image()
           sed -i 's|image, err := daemon.Image(reference)|fmt.Fprintf(os.Stderr, "[xpkg-debug] calling daemon.Image() for %s\\n", imageName)\n\timage, err := daemon.Image(reference)|' "$F"
-
-          # Replace Size() call to capture and print value
           sed -i 's|_, err = image.Size()|sz, err := image.Size()\n\tfmt.Fprintf(os.Stderr, "[xpkg-debug] daemon.Image() OK, Size()=%d err=%v\\n", sz, err)|' "$F"
-
-          # Add debug print on tar.Next() error
           sed -i 's|return errors.Wrapf(err, errFmtNoPackageFileFound, read)|fmt.Fprintf(os.Stderr, "[xpkg-debug] tar.Next() FAILED after %d entries: %v\\n", read, err)\n\t\t\treturn errors.Wrapf(err, errFmtNoPackageFileFound, read)|' "$F"
-
-          # Add debug print on package.yaml found
           sed -i 's|if h.Name == packageFile {|if h.Name == packageFile {\n\t\t\tfmt.Fprintf(os.Stderr, "[xpkg-debug] found package.yaml after %d entries\\n", read)|' "$F"
 
           echo "--- patched xpkg.go ---"
-          grep -n "xpkg-debug\|daemon.Image\|image.Size\|sz," "$F"
+          grep -n "xpkg-debug\|daemon.Image\|sz," "$F"
 
       - name: Wire replace directive in go.mod
         run: |
           go mod edit -replace github.com/crossplane-contrib/xp-testing=/tmp/xp-testing
           go mod tidy
 
-      - name: Run upgrade test TestMain setup (dummy creds, real image flow)
+      # Replicate the real upgrade test's make target:
+      # 1. docker pull FROM_TAG (mustPullImage)
+      # 2. docker build + xpkg build + docker load of local xpkg (make local-build)
+      # 3. kind cluster + crossplane + daemon.Image() (setupClusterWithCrossplane)
+      #
+      # Step 2 is what the failing CI runs do that our previous reproduce attempts skipped.
+      # The docker load of the local xpkg is the suspected trigger.
+
+      - name: "[1] mustPullImage — pull FROM_TAG"
+        run: docker pull ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+
+      - name: "[2] simulate docker load of local xpkg (the missing step)"
+        run: |
+          # Save the pulled image as a tar and reload it under a local tag — same
+          # operation as 'docker load -i provider-btp-xpkg.tar' in make local-build.
+          docker save ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1 -o /tmp/local.xpkg.tar
+          docker load -i /tmp/local.xpkg.tar
+          docker images | grep provider-btp
+
+      - name: Run upgrade test with dummy creds (triggers real TestMain flow)
         run: |
           go test -v -tags=upgrade -run Test_BaselineUpgradeProvider -timeout 10m ./test/upgrade/... 2>&1 || true
         env:
