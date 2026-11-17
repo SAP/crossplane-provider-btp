@@ -32,14 +32,18 @@ func (c *BtpCli) GetSubaccountAdmins(ctx context.Context, subaccountID string) (
 	admins := make([]string, 0, len(response.Items))
 	seen := make(map[string]struct{}, len(response.Items))
 	for _, u := range response.Items {
-		if u.Username == "" {
+		// The accounts API expects e-mails for multi-environment subaccounts, so prefer
+		// the email. Fall back to username for entries without one (e.g. technical users)
+		// or for the default identity provider where username already is the e-mail.
+		admin := u.Email
+		if admin == "" {
 			continue
 		}
-		if _, ok := seen[u.Username]; ok {
+		if _, ok := seen[admin]; ok {
 			continue
 		}
-		seen[u.Username] = struct{}{}
-		admins = append(admins, u.Username)
+		seen[admin] = struct{}{}
+		admins = append(admins, admin)
 	}
 
 	return admins, nil
@@ -56,7 +60,7 @@ type RoleCollectionAssignmentsResponse struct {
 }
 
 type RoleCollectionUser struct {
-	Username string `json:"username,omitempty"`
+	Email string `json:"email,omitempty"`
 }
 
 type Subaccount struct {
