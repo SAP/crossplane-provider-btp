@@ -52,5 +52,30 @@ jobs:
             "http://localhost/images/ghcr.io%2Fsap%2Fcrossplane-provider-btp%2Fcrossplane%2Fprovider-btp:v2.3.1/get" | \
             tar -tv 2>&1
 
-      - name: Run go-containerregistry daemon.Image reproducer
+      - name: Run go-containerregistry daemon.Image reproducer (fresh pull)
+        run: go run .github/workflows/investigate/main.go ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+
+      - name: Re-pull without removing (simulate cached entry)
+        run: docker pull ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+
+      - name: Run go-containerregistry daemon.Image reproducer (cached)
+        run: go run .github/workflows/investigate/main.go ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+
+      - name: Remove image and re-pull (simulate stale cache eviction)
+        run: |
+          docker rmi ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+          docker pull ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+
+      - name: Run go-containerregistry daemon.Image reproducer (after rmi+repull)
+        run: go run .github/workflows/investigate/main.go ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+
+      - name: Install kind
+        run: |
+          curl -sLo kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+          chmod +x kind && sudo mv kind /usr/local/bin/kind
+
+      - name: Create kind cluster (simulates upgrade test setup)
+        run: kind create cluster --name investigate
+
+      - name: Run go-containerregistry daemon.Image reproducer (after kind cluster created)
         run: go run .github/workflows/investigate/main.go ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
