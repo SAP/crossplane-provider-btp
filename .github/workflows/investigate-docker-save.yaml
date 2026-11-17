@@ -18,6 +18,9 @@ jobs:
           docker info
           docker version
 
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Pull provider image
         run: |
           docker pull ghcr.io/sap/crossplane-provider-btp:v2.3.1
