@@ -36,6 +36,13 @@ func newDirectory(c *btpcli.Child) *directory {
 	}
 }
 
+// newDirectoryWithAdmins builds a *directory test fixture with the given admins.
+func newDirectoryWithAdmins(c *btpcli.Child, admins []string) *directory {
+	d := newDirectory(c)
+	d.Admins = admins
+	return d
+}
+
 // stubEventHandler is a minimal export.EventHandler that records warnings so
 // tests can assert that resolution failures are surfaced.
 type stubEventHandler struct {
@@ -69,7 +76,10 @@ func TestConvertDirectoryResource(t *testing.T) {
 		// seed holds the directories that are considered "selected/exported",
 		// i.e. present in the cache for reference resolution.
 		seed []*directory
-		want *yaml.ResourceWithComment
+		// wantWarn is true when a Warn event is expected (reference resolution failures).
+		// The directoryAdmins comment alone does not emit a Warn event.
+		wantWarn bool
+		want     *yaml.ResourceWithComment
 	}{
 		{
 			name: "all fields present, no resolution",
@@ -89,7 +99,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 				desc := "a child directory"
 				subdomain := "child-subdomain"
 				dn := childName
-				return yaml.NewResourceWithComment(&v1alpha1.Directory{
+				rwc := yaml.NewResourceWithComment(&v1alpha1.Directory{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       v1alpha1.DirectoryKind,
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
@@ -107,6 +117,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 						ForProvider: v1alpha1.DirectoryParameters{
 							DisplayName:       &dn,
 							DirectoryFeatures: []string{"DEFAULT"},
+							DirectoryAdmins:   []string{},
 							Description:       &desc,
 							Subdomain:         &subdomain,
 							// Parent is another directory -> raw GUID kept when not resolving.
@@ -115,6 +126,9 @@ func TestConvertDirectoryResource(t *testing.T) {
 						},
 					},
 				})
+				// DEFAULT directory has no AUTHORIZATIONS feature -> no admins -> commented out.
+				rwc.AddComment(warnMissingAdmins)
+				return rwc
 			}(),
 		},
 		{
@@ -133,7 +147,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 			},
 			want: func() *yaml.ResourceWithComment {
 				dn := parentName
-				return yaml.NewResourceWithComment(&v1alpha1.Directory{
+				rwc := yaml.NewResourceWithComment(&v1alpha1.Directory{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       v1alpha1.DirectoryKind,
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
@@ -151,10 +165,13 @@ func TestConvertDirectoryResource(t *testing.T) {
 						ForProvider: v1alpha1.DirectoryParameters{
 							DisplayName:       &dn,
 							DirectoryFeatures: []string{"DEFAULT"},
+							DirectoryAdmins:   []string{},
 							// No DirectoryGuid and no DirectoryRef: parent is the global account.
 						},
 					},
 				})
+				rwc.AddComment(warnMissingAdmins)
+				return rwc
 			}(),
 		},
 		{
@@ -171,48 +188,6 @@ func TestConvertDirectoryResource(t *testing.T) {
 			seed: []*directory{
 				// Parent is in the exported set, so it resolves.
 				newDirectory(&btpcli.Child{GUID: parentGUID, DisplayName: parentName, DirectoryType: "DIRECTORY"}),
-			},
-			want: func() *yaml.ResourceWithComment {
-				dn := childName
-				return yaml.NewResourceWithComment(&v1alpha1.Directory{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       v1alpha1.DirectoryKind,
-						APIVersion: v1alpha1.CRDGroupVersion.String(),
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: childResourceName,
-						Annotations: map[string]string{
-							"crossplane.io/external-name": childGUID,
-						},
-					},
-					Spec: v1alpha1.DirectorySpec{
-						ClusterManagedResourceSpec: v2.ClusterManagedResourceSpec{
-							ManagementPolicies: []v2.ManagementAction{v2.ManagementActionObserve},
-						},
-						ForProvider: v1alpha1.DirectoryParameters{
-							DisplayName:       &dn,
-							DirectoryFeatures: []string{"DEFAULT"},
-							// DirectoryGuid cleared, ref points at the parent's k8s name.
-							DirectoryRef: &v2.Reference{Name: parentResourceName},
-						},
-					},
-				})
-			}(),
-		},
-		{
-			name: "parent not in export set, warning and GUID kept",
-			dir: newDirectory(&btpcli.Child{
-				GUID:              childGUID,
-				DisplayName:       childName,
-				ParentGUID:        parentGUID,
-				GlobalAccountGUID: globalAccountGUID,
-				DirectoryType:     "DIRECTORY",
-				DirectoryFeatures: []string{"DEFAULT"},
-			}),
-			resolveReferences: true,
-			// Only the child itself is in the cache; the parent was not selected.
-			seed: []*directory{
-				newDirectory(&btpcli.Child{GUID: childGUID, DisplayName: childName, DirectoryType: "DIRECTORY"}),
 			},
 			want: func() *yaml.ResourceWithComment {
 				dn := childName
@@ -234,11 +209,59 @@ func TestConvertDirectoryResource(t *testing.T) {
 						ForProvider: v1alpha1.DirectoryParameters{
 							DisplayName:       &dn,
 							DirectoryFeatures: []string{"DEFAULT"},
+							DirectoryAdmins:   []string{},
+							// DirectoryGuid cleared, ref points at the parent's k8s name.
+							DirectoryRef: &v2.Reference{Name: parentResourceName},
+						},
+					},
+				})
+				rwc.AddComment(warnMissingAdmins)
+				return rwc
+			}(),
+		},
+		{
+			name: "parent not in export set, warning and GUID kept",
+			dir: newDirectory(&btpcli.Child{
+				GUID:              childGUID,
+				DisplayName:       childName,
+				ParentGUID:        parentGUID,
+				GlobalAccountGUID: globalAccountGUID,
+				DirectoryType:     "DIRECTORY",
+				DirectoryFeatures: []string{"DEFAULT"},
+			}),
+			resolveReferences: true,
+			// Only the child itself is in the cache; the parent was not selected.
+			seed: []*directory{
+				newDirectory(&btpcli.Child{GUID: childGUID, DisplayName: childName, DirectoryType: "DIRECTORY"}),
+			},
+			wantWarn: true,
+			want: func() *yaml.ResourceWithComment {
+				dn := childName
+				rwc := yaml.NewResourceWithComment(&v1alpha1.Directory{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       v1alpha1.DirectoryKind,
+						APIVersion: v1alpha1.CRDGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: childResourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": childGUID,
+						},
+					},
+					Spec: v1alpha1.DirectorySpec{
+						ClusterManagedResourceSpec: v2.ClusterManagedResourceSpec{
+							ManagementPolicies: []v2.ManagementAction{v2.ManagementActionObserve},
+						},
+						ForProvider: v1alpha1.DirectoryParameters{
+							DisplayName:       &dn,
+							DirectoryFeatures: []string{"DEFAULT"},
+							DirectoryAdmins:   []string{},
 							// Unresolved: GUID retained as fallback, no ref.
 							DirectoryGuid: parentGUID,
 						},
 					},
 				})
+				rwc.AddComment(warnMissingAdmins)
 				rwc.AddComment(resources.WarnCannotResolveDirectory + ": " + parentGUID)
 				return rwc
 			}(),
@@ -270,11 +293,92 @@ func TestConvertDirectoryResource(t *testing.T) {
 						ForProvider: v1alpha1.DirectoryParameters{
 							DisplayName:       &dn,
 							DirectoryFeatures: []string{"DEFAULT"},
+							DirectoryAdmins:   []string{},
 						},
 					},
 				})
 				rwc.AddComment(warnMissingDisplayName)
 				rwc.AddComment(warnMissingGuid)
+				rwc.AddComment(warnMissingAdmins)
+				return rwc
+			}(),
+		},
+		{
+			name: "authorizations feature with two admins is emitted cleanly",
+			dir: newDirectoryWithAdmins(&btpcli.Child{
+				GUID:              childGUID,
+				DisplayName:       childName,
+				ParentGUID:        globalAccountGUID,
+				GlobalAccountGUID: globalAccountGUID,
+				DirectoryType:     "DIRECTORY",
+				DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS", "AUTHORIZATIONS"},
+			}, []string{"admin1@example.com", "admin2@example.com"}),
+			resolveReferences: false,
+			want: func() *yaml.ResourceWithComment {
+				dn := childName
+				// No comment: the resource satisfies the CRD and is emitted as a manifest.
+				return yaml.NewResourceWithComment(&v1alpha1.Directory{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       v1alpha1.DirectoryKind,
+						APIVersion: v1alpha1.CRDGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: childResourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": childGUID,
+						},
+					},
+					Spec: v1alpha1.DirectorySpec{
+						ClusterManagedResourceSpec: v2.ClusterManagedResourceSpec{
+							ManagementPolicies: []v2.ManagementAction{v2.ManagementActionObserve},
+						},
+						ForProvider: v1alpha1.DirectoryParameters{
+							DisplayName:       &dn,
+							DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS", "AUTHORIZATIONS"},
+							DirectoryAdmins:   []string{"admin1@example.com", "admin2@example.com"},
+							// Parent is the global account: no DirectoryGuid, no ref.
+						},
+					},
+				})
+			}(),
+		},
+		{
+			name: "authorizations feature with a single admin is commented out",
+			dir: newDirectoryWithAdmins(&btpcli.Child{
+				GUID:              childGUID,
+				DisplayName:       childName,
+				ParentGUID:        globalAccountGUID,
+				GlobalAccountGUID: globalAccountGUID,
+				DirectoryType:     "DIRECTORY",
+				DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS", "AUTHORIZATIONS"},
+			}, []string{"admin1@example.com"}),
+			resolveReferences: false,
+			want: func() *yaml.ResourceWithComment {
+				dn := childName
+				rwc := yaml.NewResourceWithComment(&v1alpha1.Directory{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       v1alpha1.DirectoryKind,
+						APIVersion: v1alpha1.CRDGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: childResourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": childGUID,
+						},
+					},
+					Spec: v1alpha1.DirectorySpec{
+						ClusterManagedResourceSpec: v2.ClusterManagedResourceSpec{
+							ManagementPolicies: []v2.ManagementAction{v2.ManagementActionObserve},
+						},
+						ForProvider: v1alpha1.DirectoryParameters{
+							DisplayName:       &dn,
+							DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS", "AUTHORIZATIONS"},
+							DirectoryAdmins:   []string{"admin1@example.com"},
+						},
+					},
+				})
+				// Fewer than two admins -> cannot satisfy minItems: 2 -> commented out.
+				rwc.AddComment(warnMissingAdmins)
 				return rwc
 			}(),
 		},
@@ -302,14 +406,17 @@ func TestConvertDirectoryResource(t *testing.T) {
 			}
 
 			// A resolution-failure comment must be accompanied by a Warn event.
-			if wantHasComment && len(tt.seed) > 0 {
+			if tt.wantWarn {
 				r.NotEmpty(eh.warnings, "expected a warning to be emitted on failed resolution")
+			} else {
+				r.Empty(eh.warnings, "did not expect a warning")
 			}
 
 			// Verify resource type and contents.
 			gotDir, gotOk := result.Resource().(*v1alpha1.Directory)
 			wantDir, wantOk := tt.want.Resource().(*v1alpha1.Directory)
 			r.True(gotOk && wantOk, "expected resource type to be *v1alpha1.Directory")
+			r.NotNil(gotDir.Spec.ForProvider.DirectoryAdmins, "DirectoryAdmins must not be nil")
 			r.Equal(wantDir, gotDir)
 		})
 	}

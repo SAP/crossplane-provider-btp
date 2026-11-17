@@ -112,9 +112,38 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		slog.DebugContext(ctx, "Directories after --directory filter", "count", cache.Len())
 	}
 
+	// Fetch the current administrators for each selected directory that has the user
+	// authorization management (AUTHORIZATIONS) feature enabled. Directories without it
+	// have no "Directory Administrator" role collection, so there are no admins to fetch;
+	// convert will comment those out. A lookup failure for a single directory must not
+	// abort the whole export.
+	for _, d := range cache.All() {
+		if !hasAuthorizations(d.DirectoryFeatures) {
+			continue
+		}
+		admins, err := btpClient.GetDirectoryAdmins(ctx, d.GUID)
+		if err != nil {
+			slog.WarnContext(ctx, "Failed to get directory admins", "directory", d.GUID, "error", err)
+			continue
+		}
+		d.Admins = admins
+	}
+
 	directoryCache = cache
 
 	return directoryCache, nil
+}
+
+// hasAuthorizations reports whether the directory has the user authorization management
+// feature enabled, which is a prerequisite for the "Directory Administrator" role
+// collection to exist.
+func hasAuthorizations(features []string) bool {
+	for _, f := range features {
+		if f == "AUTHORIZATIONS" {
+			return true
+		}
+	}
+	return false
 }
 
 func GetK8sResourceNameByID(ctx context.Context, btpClient *btpcli.BtpCli, id string) (string, error) {
@@ -138,6 +167,12 @@ func GetK8sResourceNameByID(ctx context.Context, btpClient *btpcli.BtpCli, id st
 type directory struct {
 	*btpcli.Child
 	*yaml.ResourceWithComment
+
+	// Admins holds the user emails assigned to the "Directory Administrator" role
+	// collection. Populated only for directories with the AUTHORIZATIONS feature; nil
+	// otherwise. convert emits an empty list and comments the resource out when fewer
+	// than two admins are available.
+	Admins []string
 }
 
 var _ resources.BtpResource = &directory{}

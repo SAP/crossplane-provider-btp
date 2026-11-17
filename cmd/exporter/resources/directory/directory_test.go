@@ -84,6 +84,30 @@ func TestGet_DerivesAncestorDirectoriesFromSelectedSubaccounts(t *testing.T) {
 	}
 }
 
+func TestGet_PopulatesAdminsOnlyForAuthorizationsDirectories(t *testing.T) {
+	resetCaches(t)
+
+	command := &cobra.Command{}
+	subaccount.Param().AttachToCommand(command)
+	Param().AttachToCommand(command)
+	require.NoError(t, command.ParseFlags([]string{"--subaccount", "sa-c"}))
+	subaccount.Param().BindConfiguration(command)
+	Param().BindConfiguration(command)
+
+	cache, err := Get(context.Background(), btpcli.NewClient(fakeBTPCLIWithAdmins(t)))
+	require.NoError(t, err)
+
+	// dir-1 has the AUTHORIZATIONS feature -> admins fetched.
+	dir1 := cache.Get("dir-1")
+	require.NotNil(t, dir1)
+	require.Equal(t, []string{"admin1@example.com", "admin2@example.com"}, dir1.Admins)
+
+	// dir-1-1 has only DEFAULT -> admin fetch skipped, admins stay nil.
+	dir11 := cache.Get("dir-1-1")
+	require.NotNil(t, dir11)
+	require.Nil(t, dir11.Admins)
+}
+
 func TestGetK8sResourceNameByID(t *testing.T) {
 	resetCaches(t)
 
@@ -148,6 +172,32 @@ func fakeBTPCLI(t *testing.T) string {
 	script := `#!/bin/sh
 for arg in "$@"; do
   case "$arg" in
+    accounts/global-account) printf '%s\n' '` + hierarchyJSON + `'; exit 0 ;;
+    accounts/subaccount) printf '%s\n' '` + flatList + `'; exit 0 ;;
+  esac
+done
+printf '%s\n' '{}'
+`
+	require.NoError(t, os.WriteFile(cliPath, []byte(script), 0o755))
+	return cliPath
+}
+
+// fakeBTPCLIWithAdmins is like fakeBTPCLI but gives dir-1 the AUTHORIZATIONS feature
+// (dir-1-1 keeps only DEFAULT) and answers the "Directory Administrator" role-collection
+// lookup with two admins. It lets TestGet verify that admins are fetched only for
+// directories that have user authorization management enabled.
+func fakeBTPCLIWithAdmins(t *testing.T) string {
+	t.Helper()
+
+	const hierarchyJSON = `{"guid":"ga","subaccounts":[{"guid":"sa-a","displayName":"Subaccount-A"}],"children":[{"guid":"dir-1","displayName":"Dir-1","directoryType":"FOLDER","directoryFeatures":["DEFAULT","ENTITLEMENTS","AUTHORIZATIONS"],"subaccounts":[{"guid":"sa-b","displayName":"Subaccount-B"}],"children":[{"guid":"dir-1-1","displayName":"Dir-1_1","directoryType":"FOLDER","directoryFeatures":["DEFAULT"],"subaccounts":[{"guid":"sa-c","displayName":"Subaccount-C"},{"guid":"sa-d","displayName":"Subaccount-D"}]}]}]}`
+	const flatList = `{"value":[{"guid":"sa-a","displayName":"Subaccount-A"},{"guid":"sa-b","displayName":"Subaccount-B"},{"guid":"sa-c","displayName":"Subaccount-C"},{"guid":"sa-d","displayName":"Subaccount-D"}]}`
+	const roleCollection = `{"items":[{"email":"admin1@example.com"},{"email":"admin2@example.com"}]}`
+
+	cliPath := filepath.Join(t.TempDir(), "btp")
+	script := `#!/bin/sh
+for arg in "$@"; do
+  case "$arg" in
+    security/role-collection) printf '%s\n' '` + roleCollection + `'; exit 0 ;;
     accounts/global-account) printf '%s\n' '` + hierarchyJSON + `'; exit 0 ;;
     accounts/subaccount) printf '%s\n' '` + flatList + `'; exit 0 ;;
   esac

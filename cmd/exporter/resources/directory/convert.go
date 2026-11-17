@@ -17,6 +17,7 @@ import (
 const (
 	warnMissingDisplayName = "WARNING: 'displayName' field is missing in the source, cannot set 'DisplayName'"
 	warnMissingGuid        = "WARNING: 'guid' field is missing in the source, cannot set 'external-name'"
+	warnMissingAdmins      = "WARNING: fewer than 2 directory administrators available (directory lacks the AUTHORIZATIONS feature or has too few admins), cannot satisfy required 'directoryAdmins' (minItems: 2)"
 )
 
 func convertDirectoryResource(ctx context.Context, btpClient *btpcli.BtpCli, d *directory, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
@@ -24,6 +25,12 @@ func convertDirectoryResource(ctx context.Context, btpClient *btpcli.BtpCli, d *
 	dGuid := d.GetID()
 	resourceName := d.GenerateK8sResourceName()
 	externalName := d.GetExternalName()
+	// Never nil: a directory without admins still emits an empty list so the manifest
+	// has a non-null 'directoryAdmins'.
+	dAdmins := d.Admins
+	if dAdmins == nil {
+		dAdmins = []string{}
+	}
 
 	// Create Directory with required fields first.
 	directoryResource := yaml.NewResourceWithComment(
@@ -47,6 +54,8 @@ func convertDirectoryResource(ctx context.Context, btpClient *btpcli.BtpCli, d *
 				ForProvider: v1alpha1.DirectoryParameters{
 					DisplayName:       &dDisplayName,
 					DirectoryFeatures: d.DirectoryFeatures,
+					// Administrators assigned to the "Directory Administrator" role collection.
+					DirectoryAdmins: dAdmins,
 				},
 			},
 		})
@@ -60,6 +69,12 @@ func convertDirectoryResource(ctx context.Context, btpClient *btpcli.BtpCli, d *
 	}
 	if dGuid == "" {
 		directoryResource.AddComment(warnMissingGuid)
+	}
+	// The CRD requires 'directoryAdmins' to have at least two entries. This cannot be met
+	// for directories without the AUTHORIZATIONS feature (no admins to fetch) or with fewer
+	// than two admins, so comment those out rather than emit a manifest admission rejects.
+	if len(dAdmins) < 2 {
+		directoryResource.AddComment(warnMissingAdmins)
 	}
 
 	// Fill the optional fields that are relevant for the Update operation, to have it match status.atProvider
