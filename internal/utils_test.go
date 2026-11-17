@@ -95,6 +95,16 @@ func TestFlattenConnectionDetails(t *testing.T) {
 				providerv1alpha1.RawBindingKey: []byte(`{"endpoints":{"api":"https://api.example.com"}}`),
 			},
 		},
+		"NestedObjectKeysSorted": {
+			reason: "should re-marshal nested objects with sorted keys so the output is deterministic",
+			input: map[string][]byte{
+				"json_obj": []byte(`{"uaa":{"url":"u","key":"k","clientid":"c","zoneid":"z","apiurl":"a","sburl":"s","tenantid":"t","xsappname":"x","certurl":"e","identityzone":"i"}}`),
+			},
+			want: map[string][]byte{
+				"uaa":                          []byte(`{"apiurl":"a","certurl":"e","clientid":"c","identityzone":"i","key":"k","sburl":"s","tenantid":"t","url":"u","xsappname":"x","zoneid":"z"}`),
+				providerv1alpha1.RawBindingKey: []byte(`{"uaa":{"url":"u","key":"k","clientid":"c","zoneid":"z","apiurl":"a","sburl":"s","tenantid":"t","xsappname":"x","certurl":"e","identityzone":"i"}}`),
+			},
+		},
 	}
 
 	for name, tc := range cases {
