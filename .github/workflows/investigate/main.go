@@ -1,5 +1,3 @@
-//go:build ignore
-
 // Reproducer for the daemon.Image() / docker save bug seen in upgrade tests on ubuntu-26.04 / Docker 29.4.2.
 // Replicates xp-testing's extractPackageYamlFromImage path exactly.
 package main

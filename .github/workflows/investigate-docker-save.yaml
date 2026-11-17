@@ -57,7 +57,8 @@ jobs:
 
       # Step 4 (matches InstallCrossplaneProvider → loadCrossplanePackageToCluster → daemon.Image):
       - name: "[4] daemon.Image reproducer — exact xp-testing path after full setup"
-        run: go run .github/workflows/investigate/main.go ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+        run: go run . ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+        working-directory: .github/workflows/investigate
 
       # Also check raw docker save and Docker API for comparison
       - name: docker save CLI size (post-setup)
