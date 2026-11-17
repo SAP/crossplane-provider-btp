@@ -50,26 +50,26 @@ jobs:
           go mod tidy
 
       # Replicate the real upgrade test's make target:
-      # 1. docker pull FROM_TAG (mustPullImage)
-      # 2. docker build + xpkg build + docker load of local xpkg (make local-build)
+      # 1. docker build + xpkg build + docker load of local xpkg (make local-build)
+      # 2. docker pull FROM_TAG happens INSIDE go test (mustPullImage) — NOT before
       # 3. kind cluster + crossplane + daemon.Image() (setupClusterWithCrossplane)
       #
-      # Step 2 is what the failing CI runs do that our previous reproduce attempts skipped.
-      # The docker load of the local xpkg is the suspected trigger.
+      # Key finding: real failing runs never pre-pull v2.3.1 before go test.
+      # The prior investigate runs did a pre-pull step which masked the bug:
+      # mustPullImage inside go test became a cached no-op instead of a cold pull.
 
-      - name: "[1] mustPullImage — pull FROM_TAG"
-        run: docker pull ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
-
-      - name: "[2] simulate docker load of local xpkg (the missing step)"
+      - name: "[1] make local-build (loads xpkg into daemon, no v2.3.1 yet)"
         run: |
           make local-build BUILD_ID=investigate-0
           docker images | grep provider-btp
+          echo "--- v2.3.1 NOT in daemon yet (cold pull will happen inside go test) ---"
+          docker images | grep v2.3.1 || echo "confirmed: v2.3.1 absent"
           # Compute BUILD_REGISTRY exactly as the Makefile does: sha256sum(HOSTNAME-pwd)[:8]
           BUILD_REGISTRY="index.docker.io/build-$(echo "${HOSTNAME}-$(pwd)" | sha256sum | cut -c1-8)"
           echo "UUT_XPKG=${BUILD_REGISTRY}/provider-btp-xpkg:latest" >> $GITHUB_ENV
           echo "UUT_IMAGES={\"crossplane/provider-btp\":\"${BUILD_REGISTRY}/provider-btp-xpkg:latest\"}" >> $GITHUB_ENV
 
-      - name: Run upgrade test with dummy creds (triggers real TestMain flow)
+      - name: "[2] Run upgrade test — first docker pull of v2.3.1 happens here (cold pull into populated store)"
         run: |
           go test -v -tags=upgrade -run Test_BaselineUpgradeProvider -timeout 10m ./test/upgrade/... 2>&1 || true
         env:
