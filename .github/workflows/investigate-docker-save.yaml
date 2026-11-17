@@ -28,50 +28,40 @@ jobs:
       - name: Log in to ghcr.io
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # Step 1 (matches TestMain): LoadUpgradePackages → mustPullImage
-      - name: "[1] mustPullImage — pull provider image"
-        run: docker pull ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
-
-      # Step 2 (matches Configure → envfuncs.CreateCluster): kind pulls kindest/node
-      - name: Install kind
+      - name: Clone xp-testing at pinned version and add instrumentation
         run: |
-          curl -sLo kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
-          chmod +x kind && sudo mv kind /usr/local/bin/kind
+          git clone --depth 1 --branch v1.10.2 https://github.com/crossplane-contrib/xp-testing.git /tmp/xp-testing
 
-      - name: "[2] CreateCluster — kind pulls kindest/node, starts cluster"
-        run: kind create cluster --name investigate
+          F=/tmp/xp-testing/internal/xpkg/xpkg.go
 
-      # Step 3 (matches InstallCrossplane): helm pulls crossplane/crossplane from Docker Hub
-      - name: Install helm
+          # Add debug print before daemon.Image()
+          sed -i 's|image, err := daemon.Image(reference)|fmt.Fprintf(os.Stderr, "[xpkg-debug] calling daemon.Image() for %s\\n", imageName)\n\timage, err := daemon.Image(reference)|' "$F"
+
+          # Replace Size() call to capture and print value
+          sed -i 's|_, err = image.Size()|sz, err := image.Size()\n\tfmt.Fprintf(os.Stderr, "[xpkg-debug] daemon.Image() OK, Size()=%d err=%v\\n", sz, err)|' "$F"
+
+          # Add debug print on tar.Next() error
+          sed -i 's|return errors.Wrapf(err, errFmtNoPackageFileFound, read)|fmt.Fprintf(os.Stderr, "[xpkg-debug] tar.Next() FAILED after %d entries: %v\\n", read, err)\n\t\t\treturn errors.Wrapf(err, errFmtNoPackageFileFound, read)|' "$F"
+
+          # Add debug print on package.yaml found
+          sed -i 's|if h.Name == packageFile {|if h.Name == packageFile {\n\t\t\tfmt.Fprintf(os.Stderr, "[xpkg-debug] found package.yaml after %d entries\\n", read)|' "$F"
+
+          echo "--- patched xpkg.go ---"
+          grep -n "xpkg-debug\|daemon.Image\|image.Size\|sz," "$F"
+
+      - name: Wire replace directive in go.mod
         run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          go mod edit -replace github.com/crossplane-contrib/xp-testing=/tmp/xp-testing
+          go mod tidy
 
-      - name: "[3] InstallCrossplane — helm pulls crossplane/crossplane:v1.20.1"
+      - name: Run upgrade test TestMain setup (dummy creds, real image flow)
         run: |
-          helm repo add crossplane-stable https://charts.crossplane.io/stable
-          helm repo update
-          helm pull crossplane-stable/crossplane --version 1.20.1
-          helm install crossplane crossplane-stable/crossplane \
-            --namespace crossplane-system --create-namespace \
-            --version 1.20.1 --wait --timeout 5m
-
-      # Step 4 (matches InstallCrossplaneProvider → loadCrossplanePackageToCluster → daemon.Image):
-      - name: "[4] daemon.Image reproducer — exact xp-testing path after full setup"
-        run: go run . ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
-        working-directory: .github/workflows/investigate
-
-      # Also check raw docker save and Docker API for comparison
-      - name: docker save CLI size (post-setup)
-        run: |
-          SIZE=$(docker save ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1 | wc -c)
-          echo "docker save CLI size: $SIZE bytes"
-
-      - name: Docker HTTP API /get size (post-setup)
-        run: |
-          SIZE=$(curl -sf --unix-socket /var/run/docker.sock \
-            "http://localhost/images/ghcr.io%2Fsap%2Fcrossplane-provider-btp%2Fcrossplane%2Fprovider-btp:v2.3.1/get" | wc -c)
-          echo "Docker API /get size: $SIZE bytes"
-          if [ "$SIZE" -lt 100000 ]; then
-            echo "API GET returned tiny response — this is the bug"
-            exit 1
-          fi
+          go test -v -tags=upgrade -run Test_BaselineUpgradeProvider -timeout 10m ./test/upgrade/... 2>&1 || true
+        env:
+          UPGRADE_TEST_FROM_TAG: v2.3.1
+          UPGRADE_TEST_TO_TAG: v2.3.1
+          CIS_CENTRAL_BINDING: '{"dummy":"true"}'
+          BTP_TECHNICAL_USER: '{"dummy":"true"}'
+          GLOBAL_ACCOUNT: dummy-global-account
+          CLI_SERVER_URL: https://dummy.example.com
+          BUILD_ID: investigate-0
