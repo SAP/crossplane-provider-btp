@@ -134,7 +134,7 @@ type subaccount struct {
 	*btpcli.Subaccount
 	*yaml.ResourceWithComment
 
-	// Admins holds the usernames assigned to the "Subaccount Administrator"
+	// Admins holds the user emails assigned to the "Subaccount Administrator"
 	// role collection, populated in Get().
 	Admins []string
 }
