@@ -62,22 +62,21 @@ jobs:
 
       - name: "[2] simulate docker load of local xpkg (the missing step)"
         run: |
-          # Real make local-build does:
-          #   xpkg build → provider-btp-<version>.xpkg (OCI tar, different image)
-          #   docker load -i <that>.xpkg  → bare digest
-          #   docker tag <sha> index.docker.io/build-<hash>/provider-btp-xpkg:latest
-          #
-          # Previous run round-tripped v2.3.1 over itself (same tag) — no new image,
-          # couldn't trigger any interference. This step builds the real local xpkg.
           make local-build BUILD_ID=investigate-0
           docker images | grep provider-btp
+          # Compute BUILD_REGISTRY exactly as the Makefile does: sha256sum(HOSTNAME-pwd)[:8]
+          BUILD_REGISTRY="index.docker.io/build-$(echo "${HOSTNAME}-$(pwd)" | sha256sum | cut -c1-8)"
+          echo "UUT_XPKG=${BUILD_REGISTRY}/provider-btp-xpkg:latest" >> $GITHUB_ENV
+          echo "UUT_IMAGES={\"crossplane/provider-btp\":\"${BUILD_REGISTRY}/provider-btp-xpkg:latest\"}" >> $GITHUB_ENV
 
       - name: Run upgrade test with dummy creds (triggers real TestMain flow)
         run: |
           go test -v -tags=upgrade -run Test_BaselineUpgradeProvider -timeout 10m ./test/upgrade/... 2>&1 || true
         env:
           UPGRADE_TEST_FROM_TAG: v2.3.1
-          UPGRADE_TEST_TO_TAG: v2.3.1
+          UPGRADE_TEST_TO_TAG: local
+          UUT_XPKG: ${{ env.UUT_XPKG }}
+          UUT_IMAGES: ${{ env.UUT_IMAGES }}
           CIS_CENTRAL_BINDING: '{"dummy":"true"}'
           BTP_TECHNICAL_USER: '{"dummy":"true"}'
           GLOBAL_ACCOUNT: dummy-global-account
