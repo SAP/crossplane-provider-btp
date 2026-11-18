@@ -9,24 +9,21 @@ import TabItem from "@theme/TabItem";
 
 This page describes how to authenticate the Crossplane BTP provider.
 
-Authentication requires
+:::image-light
+![BTP provider authentication overview: combine a central CIS service binding with IAS trusted OIDC (recommended) or technical-user credentials (development only).](/img/btp-auth.png)
+:::
 
-**a central SAP Cloud Management service (CIS) binding stored in a Kubernetes Secret**.
-The service binding must be explicitely _(manual or via CLI/API)_ created **in a subaccount belonging to the same global account where you want to orchestrate your resources**.
 
-as well as a
+It requires **a central SAP Cloud Management service (CIS) instance** binding created _(manually or via CLI/API)_ in a subaccount belonging to the global account where you want to orchestrate your resources.
 
-**Technical user:** store the user's static credentials in a second Secret.
+as well as
 
-**OR**
+a **Passwordless ServiceAccount** trusted by IAS or a static technical user.
 
-**IAS trusted OIDC (workload identity):** trust the control plane's OIDC issuer in IAS
-  and use a projected ServiceAccount token instead of a user password.
+:::warning Avoid static users
 
-:::tip Avoid static users
-
-Static user credentials are the simpler option. For production, we recommend
-IAS trusted OIDC to avoid storing a long-lived user password.
+A technical user with static credentials is the simpler option to setup.
+For production, however, we strongly recommend IAS trusted OIDC to avoid storing a long-lived user password.
 
 :::
 
@@ -47,8 +44,8 @@ technical user's static credentials.
   </TabItem>
   <TabItem value="ias-oidc" label="IAS trusted OIDC">
 
-The provider uses the same CIS binding Secret. IAS trusts the control plane's
-OIDC issuer and maps the provider's projected ServiceAccount token to a
+The provider uses the CIS binding Secret and IAS trusts the control plane's
+OIDC issuer. It maps the provider's projected ServiceAccount token to a
 passwordless workload user with BTP role assignments.
 
 :::image-light
@@ -65,7 +62,7 @@ passwordless workload user with BTP role assignments.
 
 ## Set up SAP Cloud Management service
 
-To orchestrate your global account, you need one instance of the SAP Cloud Management service (with the **central** plan) in one of your subaccounts.
+To orchestrate your global account, you need one instance of the SAP Cloud Management service (with the **`central`** plan) in one of your subaccounts.
 To enable API access to the service instance, you need a **service binding**.
 
 The following steps create a `client_credentials` binding, which is supported by both approaches.
@@ -196,7 +193,7 @@ The following steps create a `client_credentials` binding, which is supported by
   </TabItem>
 </Tabs>
 
-### Create `Secret`: CIS
+#### Create `Secret`: CIS
 
 For **both authentication approaches**, create a Kubernetes Secret containing the
 service binding credentials. Both `ProviderConfig` examples below reference this
@@ -286,7 +283,7 @@ Choose one approach. The selection is shared with the `ProviderConfig` tabs belo
 <Tabs groupId="btp-authentication" defaultValue="technical-user">
   <TabItem value="technical-user" label="Technical user">
 
-### Create a technical user
+#### Create a technical user
 
 To allow Crossplane to communicate with the BTP API, we also need a technical user to be created on BTP.
 It's important that this technical user has admin rights to the subaccount so that Crossplane can be able to create and manage resources.
@@ -331,7 +328,7 @@ They are typically granted specific permissions tailored to the tasks they need 
       Overview** of the global account under heading **Global Account: ...** or under **Switch Global Account**
 
 
-###  Create `Secret`: technical user
+####  Create `Secret`: technical user
 
 You can create a `Secret` using the technical user _(P-user)_ credentials.
 
@@ -382,9 +379,9 @@ and the existing **`client_credentials` CIS binding for direct CIS API calls**.
 Those CIS calls use the service client's permissions, not the workload user's
 BTP roles. No additional IAS consumer application or API dependency is needed.
 
-### OIDC prerequisites and values to collect
+#### OIDC setup
 
-#### Issuer URL
+##### Issuer URL
 
 IAS uses the control plane's **ServiceAccount issuer URL** to verify the provider's
 projected token.
@@ -425,6 +422,8 @@ status:
   </TabItem>
 </Tabs>
 
+TODO: SCREENSHOT!
+
 Record this URL as `CLUSTER_ISSUER`. Open its discovery document at
 `CLUSTER_ISSUER/.well-known/openid-configuration` and collect the document's
 `jwks_uri` as `CLUSTER_JWKS_URI`. Verify that the document's `issuer` matches
@@ -436,16 +435,18 @@ human login to the control plane, and not the IAS issuer (`IAS_ISSUER`).
 Record the exact `issuer` from your IAS tenant's OIDC discovery document as
 `IAS_ISSUER`; use it as the projected token's audience in step 4.
 
-### 1. Create the workload user in IAS
+#### 1. Create the workload user in IAS
 
+TODO: SCREENSHOT!
 1. In the IAS administration console, open **Users & Authorizations → User Management**
    and add a user.
 2. Set **Email** and **Login Name** to `WORKLOAD_EMAIL`. Choose **Set status active**
    without a password or activation email, and User Type **None** where available.
 3. Under **Groups**, create a dedicated workload group and add only this user.
 
-### 2. Trust the control plane in IAS
+#### 2. Trust the control plane in IAS
 
+TODO: SCREENSHOT!
 1. Open **Identity Providers → Corporate Identity Providers** and create an
    **OpenID Connect Compliant** provider for your control plane.
 2. Open **Trust → OpenID Connect Configuration**, enter
@@ -468,8 +469,9 @@ Record the exact `issuer` from your IAS tenant's OIDC discovery document as
 5. Save the settings. Restrict who can run pods as the provider ServiceAccount or
    request its tokens; the example mapping identifies it by name, not UID.
 
-### 3. Connect IAS to the BTP global account
+#### 3. Connect IAS to the BTP global account
 
+TODO: SCREENSHOT!
 1. In the **BTP global-account cockpit**, open **Security → Trust Configuration**
    and establish platform trust with your IAS tenant. Reuse an existing trust
    for this global-account/IAS pair instead of creating a duplicate.
@@ -493,7 +495,7 @@ the IAS user from step 1.
 If assigning roles through the CLI instead, include `--of-idp BTP_ORIGIN` to select
 the same IAS identity. CF operations also require the appropriate CF roles/origin.
 
-### 4. Mount the provider's token
+#### 4. Mount the provider's token
 
 On the **provider's control plane**, save the following as `runtime-config.yaml`.
 Replace `IAS_ISSUER`, the ServiceAccount name and `WORKLOAD_IDENTITY_VERSION` with
@@ -546,10 +548,6 @@ configuration rather than overwriting generated resources.
 ```sh title="Run in Terminal"
 kubectl apply -f runtime-config.yaml
 ```
-
-Before continuing, confirm the provider is healthy, its CRD includes
-`spec.workloadIdentity`, and the runtime has the intended ServiceAccount and token
-mount. Then use the **IAS trusted OIDC** `ProviderConfig` tab below.
 
   </TabItem>
 </Tabs>
@@ -626,40 +624,6 @@ This configuration needs only `tokenFile`, `identityProvider` and `userEmail`
 under `workloadIdentity`. Keep the CIS binding Secret; no user password or IAS
 client secret is added.
 
-
-<details>
-<summary>Additional resource prerequisites and operational notes</summary>
-
-### Environment resources
-
-The central CIS Secret configures the provider's account APIs. Native environment
-resources additionally need a **local** CIS binding in their target subaccount,
-using `client_credentials` for this setup, with its binding JSON available under
-`__raw` in their Cloud Management Secret.
-This is a separate resource prerequisite; OIDC does not create or replace these bindings.
-
-### Use the workload email for Subaccount administrators
-
-When [creating a Subaccount](../account/subaccount.mdx), use the chosen
-`WORKLOAD_EMAIL` in `subaccountAdmins`, rather than the raw Kubernetes subject:
-
-```yaml
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
-kind: Subaccount
-metadata:
-  name: my-subaccount
-spec:
-  providerConfigRef:
-    name: account-provider-config
-  forProvider:
-    displayName: My subaccount
-    region: BTP_REGION
-    subdomain: UNIQUE_SUBDOMAIN
-    subaccountAdmins:
-      - WORKLOAD_EMAIL
-```
-
-</details>
 
   </TabItem>
 </Tabs>
