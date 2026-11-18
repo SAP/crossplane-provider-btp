@@ -269,7 +269,8 @@ Exports service plan entitlements assigned to directories using `btp list accoun
 **CLI flags:**
 | Flag | Description |
 |------|-------------|
-| `--directory <GUID,...>` | Required source directory GUIDs; independent of `--subaccount` |
+| `--subaccount <value>` | Source subaccount ID or name regex; its ancestor directories define the export scope |
+| `--directory <value>` | Optional filter for ancestor directories by ID or display-name regex |
 | `--directoryentitlement <value>` | Exact compound ID (`directoryID/serviceName/planName`) or regex matching `serviceName/planName` |
 
 Omit `--directoryentitlement` for interactive entitlement selection, or use `'.*'` to export every plan in the specified directories.
@@ -278,15 +279,17 @@ Omit `--directoryentitlement` for interactive entitlement selection, or use `'.*
 - Only the directory's own `entitledServices` are exported; allocations to child subaccounts/directories in `assignedServices` are excluded.
 - Numeric plan categories (`SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, `ENVIRONMENT`) preserve `amount` and available `autoDistributeAmount`, including zero values. Non-numeric plans omit these fields because numeric quota is not applicable. `autoAssign` and the plan's unique identifier are preserved.
 - `distribute` is omitted because the CLI does not expose this write-time action. Add it explicitly if you want to distribute entitlements to existing subaccounts when enabling management.
-- Manifests use `spec.forProvider.directoryId` until Directory export (W2-1) is available. With `--resolve-references`, a warning is emitted once per directory-entitlement export to explain this fallback; the manifests remain usable.
-- `--all` includes this kind but still requires `--directory` for its directory scope. Without it, directory entitlement export emits a warning and the other kinds continue.
+- Manifests use `spec.forProvider.directoryId` by default. With `--resolve-references`, they use `directoryRef.name` matching the exported Directory resource name instead. If resolution fails, the ID is retained and a warning is added.
+- `--all` includes this kind and exports entitlements for the source subaccount's ancestor directories without requiring `--directory`.
 
 **Example:**
 ```bash
 go run ./cmd/exporter export \
- --kind directoryentitlement \
-  --directory '<directory-guid>' \
+  --kind directoryentitlement \
+  --subaccount '<subaccount-guid>' \
+  --directory '^My Directory$' \
   --directoryentitlement '.*' \
+  --resolve-references \
   -o directory-entitlements.yaml
  ```
 ### Subaccount Trust Configuration

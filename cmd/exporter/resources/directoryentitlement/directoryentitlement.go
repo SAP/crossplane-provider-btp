@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
+	"slices"
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
 	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directory"
 )
 
 const KindName = "directoryentitlement"
@@ -20,13 +21,10 @@ var (
 	entitlementParam = configparam.StringSlice(KindName, "Directory entitlement ID (directoryID/serviceName/planName) or regex matching serviceName/planName.").
 				WithFlagName(KindName).
 				WithExample("--directoryentitlement '.*'")
-	directoryParam = configparam.StringSlice("directory", "Source directory GUIDs for directory entitlement export (comma-separated).").
-			WithFlagName("directory")
 )
 
 func init() {
 	resources.RegisterKind(exporter{})
-	export.AddConfigParams(directoryParam)
 }
 
 type exporter struct{}
@@ -45,11 +43,9 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, handler 
 	slog.DebugContext(ctx, "Directory entitlements after selection", "count", cache.Len())
 	if cache.Len() == 0 {
 		handler.Warn(fmt.Errorf("no directory entitlements found"))
-	} else if options.ResolveReferences {
-		handler.Warn(fmt.Errorf("directory reference resolution is not yet supported; exporting directoryId instead of directoryRef"))
 	}
 	for _, entitlement := range cache.All() {
-		handler.Resource(convertDirectoryEntitlementResource(entitlement))
+		handler.Resource(convertDirectoryEntitlementResource(ctx, btpClient, entitlement, handler, options.ResolveReferences))
 	}
 	return nil
 }
@@ -58,21 +54,19 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli, options resources.Option
 	if entitlementCache != nil {
 		return entitlementCache, nil
 	}
-	directoryIDs := directoryParam.Value()
-	if len(directoryIDs) == 0 {
-		return nil, fmt.Errorf("--directory is required for directoryentitlement export")
+	directories, err := directory.Get(ctx, btpClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get directories: %w", err)
 	}
 	cache := resources.NewResourceCache[*directoryEntitlement]()
-	seen := make(map[string]bool)
-	for _, directoryID := range directoryIDs {
-		directoryID = strings.TrimSpace(directoryID)
-		if directoryID == "" {
-			return nil, fmt.Errorf("--directory must contain non-empty directory GUIDs")
-		}
-		if seen[directoryID] {
+	for _, directoryID := range directories.AllIDs() {
+		d := directories.Get(directoryID)
+		// Plain directories do not manage entitlements, and the BTP CLI can
+		// return empty output rather than JSON when queried for them.
+		if !slices.Contains(d.DirectoryFeatures, "ENTITLEMENTS") {
+			slog.DebugContext(ctx, "Skipping directory without entitlement management", "directory", d.GUID)
 			continue
 		}
-		seen[directoryID] = true
 		services, err := btpClient.ListDirectoryEntitlements(ctx, directoryID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list entitlements for directory %s: %w", directoryID, err)

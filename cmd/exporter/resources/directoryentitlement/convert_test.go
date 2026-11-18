@@ -35,7 +35,7 @@ func TestConvertDirectoryEntitlementResource(t *testing.T) {
 				},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			}
-			result := convertDirectoryEntitlementResource(e)
+			result := convertDirectoryEntitlementResource(t.Context(), nil, e, nil, false)
 			cr := result.Resource().(*v1alpha1.DirectoryEntitlement)
 			require.Equal(t, "DirectoryEntitlement", cr.Kind)
 			require.Equal(t, v1alpha1.CRDGroupVersion.String(), cr.APIVersion)
@@ -70,7 +70,7 @@ func TestConvertDirectoryEntitlementMissingOptionalFields(t *testing.T) {
 		plan:                btpcli.DirectoryEntitledServicePlan{Name: "standard", Category: "SERVICE"},
 		ResourceWithComment: yaml.NewResourceWithComment(nil),
 	}
-	result := convertDirectoryEntitlementResource(e)
+	result := convertDirectoryEntitlementResource(t.Context(), nil, e, nil, false)
 	cr := result.Resource().(*v1alpha1.DirectoryEntitlement)
 	require.Equal(t, ptr.To("dir-one"), cr.Spec.ForProvider.DirectoryID)
 	require.Nil(t, cr.Spec.ForProvider.DirectoryRef)
@@ -100,7 +100,7 @@ func TestConvertDirectoryEntitlementMissingIdentity(t *testing.T) {
 			case "plan":
 				e.plan.Name = ""
 			}
-			result := convertDirectoryEntitlementResource(e)
+			result := convertDirectoryEntitlementResource(t.Context(), nil, e, nil, false)
 			cr := result.Resource().(*v1alpha1.DirectoryEntitlement)
 			require.Equal(t, resources.UndefinedName, cr.Name)
 			require.Equal(t, resources.UndefinedExternalName, cr.Annotations["crossplane.io/external-name"])
