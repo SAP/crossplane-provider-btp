@@ -73,6 +73,8 @@ func fakeBTPCLI(t *testing.T) string {
 	path := filepath.Join(t.TempDir(), "btp")
 	require.NoError(t, os.WriteFile(path, []byte(`#!/bin/sh
 case "$*" in
+  "target --global-account")
+    ;;
   "--format json list security/trust")
     cat <<'JSON'
 [

@@ -79,6 +79,8 @@ func fakeBTPCLI(t *testing.T) string {
 	path := filepath.Join(t.TempDir(), "btp")
 	require.NoError(t, os.WriteFile(path, []byte(`#!/bin/sh
 case "$*" in
+  "target --global-account")
+    ;;
   "--format json list accounts/subaccount --authorized")
     echo '{"value":[{"guid":"sa-one","displayName":"First","region":"eu10"},{"guid":"sa-two","displayName":"Second","region":"eu10"}]}'
     ;;

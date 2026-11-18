@@ -21,6 +21,15 @@ func (c *BtpCli) ListSubaccountTrustConfigurations(ctx context.Context, subaccou
 // The built-in platform trust (sap.default, which has no identity provider) is
 // excluded: it is platform-wide and not an exportable resource. See IsPlatformTrust.
 func (c *BtpCli) ListGlobalaccountTrustConfigurations(ctx context.Context) ([]TrustConfiguration, error) {
+	// Target the global account of the active login first. Without this, if the
+	// CLI's active target is a subaccount, "list security/trust" would return that
+	// subaccount's trust configurations instead of the global account's, and the
+	// subaccount trust set would always be empty. Omitting the SUBDOMAIN argument
+	// targets the global account of the active login.
+	if _, err := c.Execute(ctx, "target", "--global-account"); err != nil {
+		return nil, err
+	}
+
 	var response []TrustConfiguration
 	if err := c.ExecuteJSON(ctx, &response, "list", "security/trust"); err != nil {
 		return nil, err
