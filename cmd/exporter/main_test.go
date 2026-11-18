@@ -178,6 +178,8 @@ func TestValidateExportAllOptions(t *testing.T) {
 	})
 
 	for _, kind := range resources.KindNames() {
+		// subaccount is the export scope selector, not a kind filter, so --all
+		// does not conflict with it.
 		if kind == "subaccount" {
 			continue
 		}

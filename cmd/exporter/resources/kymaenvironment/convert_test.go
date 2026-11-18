@@ -50,38 +50,42 @@ func TestConvertKymaEnvResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				CloudManagementName: cmName,
 			},
-			want: yaml.NewResourceWithComment(
-				&v1alpha1.KymaEnvironment{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       v1alpha1.KymaEnvironmentKind,
-						APIVersion: v1alpha1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: resourceName,
-						Annotations: map[string]string{
-							"crossplane.io/external-name": envID,
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.KymaEnvironment{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.KymaEnvironmentKind,
+							APIVersion: v1alpha1.SchemeGroupVersion.String(),
 						},
-					},
-					Spec: v1alpha1.KymaEnvironmentSpec{
-						SubaccountGuid: subaccountGUID,
-						ForProvider: v1alpha1.KymaEnvironmentParameters{
-							LandscapeLabel: &landscapeLabel,
-							PlanName:       planName,
-							Name:           &name,
-							Parameters:     wantParameters,
-						},
-						CloudManagementRef: &xpv2.Reference{
-							Name: cmName,
-						},
-						ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
-							ManagementPolicies: []xpv2.ManagementAction{xpv2.ManagementActionObserve},
-							WriteConnectionSecretToReference: &xpv2.SecretReference{
-								Name:      resourceName,
-								Namespace: resources.DefaultSecretNamespace,
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": envID,
 							},
 						},
-					},
-				}),
+						Spec: v1alpha1.KymaEnvironmentSpec{
+							SubaccountGuid: subaccountGUID,
+							ForProvider: v1alpha1.KymaEnvironmentParameters{
+								LandscapeLabel: &landscapeLabel,
+								PlanName:       planName,
+								Name:           &name,
+								Parameters:     wantParameters,
+							},
+							CloudManagementRef: &xpv2.Reference{
+								Name: cmName,
+							},
+							ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
+								ManagementPolicies: []xpv2.ManagementAction{xpv2.ManagementActionObserve},
+								WriteConnectionSecretToReference: &xpv2.SecretReference{
+									Name:      resourceName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnParametersManual)
+				return rwc
+			}(),
 		},
 		{
 			name: "missing subaccount GUID",
@@ -128,6 +132,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
+				rwc.AddComment(resources.WarnParametersManual)
 				return rwc
 			}(),
 		},
@@ -178,6 +183,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnUndefinedExternalName)
+				rwc.AddComment(resources.WarnParametersManual)
 				return rwc
 			}(),
 		},
@@ -225,6 +231,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnParametersManual)
 				return rwc
 			}(),
 		},
@@ -278,6 +285,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnMissingKymaName)
+				rwc.AddComment(resources.WarnParametersManual)
 				return rwc
 			}(),
 		},
@@ -328,6 +336,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingCloudManagementName)
+				rwc.AddComment(resources.WarnParametersManual)
 				return rwc
 			}(),
 		},
@@ -376,6 +385,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 				rwc.AddComment(resources.WarnMissingKymaName)
 				rwc.AddComment(resources.WarnMissingKymaPlanName)
 				rwc.AddComment(resources.WarnMissingCloudManagementName)
+				rwc.AddComment(resources.WarnParametersManual)
 				return rwc
 			}(),
 		},
@@ -430,6 +440,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment("Existing comment from previous processing")
+				rwc.AddComment(resources.WarnParametersManual)
 				return rwc
 			}(),
 		},

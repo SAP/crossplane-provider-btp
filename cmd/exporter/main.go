@@ -15,12 +15,15 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/cfenvironment"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directoryentitlement"
+  _	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directoryentitlement"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directory"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/kymaenvironment"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebinding"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccounttrustconfiguration"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subscription"
 )
 
 const (
@@ -76,6 +79,17 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	// This client does not try to log in, thus relying on an existing session.
 	// Explicit authentication can be done by a separate `login` command or by BTP CLI's `login` command.
 	btpClient := btpcli.NewClient(paramBtpCliPath.Value())
+
+	// Select the source subaccount before asking which resource kinds to export.
+	// The subaccount is the single export entrypoint; directories above it are
+	// derived from the selection. Other exporters reuse this cached selection.
+	selectedSubaccountCount, err := getSelectedSubaccountCount(ctx, btpClient)
+	if err != nil {
+		return erratt.Errorf("cannot retrieve and select subaccounts: %w", err)
+	}
+	if err := validateExportAllSubaccountSelection(paramAll.Value(), selectedSubaccountCount); err != nil {
+		return erratt.Errorf("invalid export selection: %w", err)
+	}
 
 	// Determine which kinds the user would like to have exported.
 	var selectedResources []string
@@ -165,8 +179,9 @@ func exportAllConflictFlagName(paramName string) (string, bool) {
 		return "--kind", true
 	}
 	for _, kind := range resources.KindNames() {
-		// The subaccount selector identifies the source subaccount for an
-		// export-all operation; it does not filter which kinds are exported.
+		// The subaccount selector identifies the export scope (the source
+		// subaccount) for an export-all operation; it does not filter which kinds
+		// are exported.
 		if kind == paramName && kind != "subaccount" {
 			return "--" + kind, true
 		}

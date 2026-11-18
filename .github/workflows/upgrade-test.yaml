@@ -29,8 +29,8 @@ on:
 
 jobs:
   upgrade-test:
-    runs-on: ubuntu-latest
-    environment: pr-e2e-approval
+    runs-on: ubuntu-24.04
+    environment: pr-e2e-no-approval
     env:
       # hardcoded BTP CLI version
       btp_cli_version: 2.116.3

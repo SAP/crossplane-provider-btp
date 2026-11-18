@@ -334,8 +334,8 @@ func TestResourceCache_ValuesForSelection(t *testing.T) {
 				"Resource 日本語 - [id-1]",
 			},
 			wantMappings: map[string]string{
-				"Resource 日本語 - [id-1]": "id-1",
-				"Resource Ñoño - [id-2]":   "id-2",
+				"Resource 日本語 - [id-1]":  "id-1",
+				"Resource Ñoño - [id-2]": "id-2",
 			},
 		},
 	}

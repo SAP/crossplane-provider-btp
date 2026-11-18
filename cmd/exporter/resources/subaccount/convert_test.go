@@ -1,9 +1,11 @@
 package subaccount
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SAP/xp-clifford/yaml"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,6 +15,16 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
 
+// stubEventHandler is a minimal export.EventHandler that records warnings so
+// tests can assert that resolution failures are surfaced.
+type stubEventHandler struct {
+	warnings []error
+}
+
+func (s *stubEventHandler) Warn(err error)           { s.warnings = append(s.warnings, err) }
+func (s *stubEventHandler) Resource(resource.Object) {}
+func (s *stubEventHandler) Stop()                    {}
+
 func TestConvertSubaccountResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
@@ -21,7 +33,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 	saGuid := "12345678-1234-1234-1234-123456789abc"
 	region := "eu10"
 	subdomain := "test-subdomain"
-	createdBy := "admin@example.com"
+	admins := []string{"admin@example.com", "admin2@example.com"}
 	gaGuid := "global-account-guid"
 	dirGuid := "directory-guid"
 	description := "Test description"
@@ -33,9 +45,10 @@ func TestConvertSubaccountResource(t *testing.T) {
 	wantResourceName := "test-subaccount.eu10"
 
 	tests := []struct {
-		name string
-		sa   *btpcli.Subaccount
-		want *yaml.ResourceWithComment
+		name   string
+		sa     *btpcli.Subaccount
+		admins []string
+		want   *yaml.ResourceWithComment
 	}{
 		{
 			name: "all required fields present",
@@ -44,8 +57,8 @@ func TestConvertSubaccountResource(t *testing.T) {
 				GUID:        saGuid,
 				Region:      region,
 				Subdomain:   subdomain,
-				CreatedBy:   createdBy,
 			},
+			admins: admins,
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Subaccount{
 					TypeMeta: metav1.TypeMeta{
@@ -66,7 +79,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							DisplayName:      displayName,
 							Region:           region,
 							Subdomain:        subdomain,
-							SubaccountAdmins: []string{createdBy},
+							SubaccountAdmins: admins,
 						},
 					},
 				}),
@@ -78,7 +91,6 @@ func TestConvertSubaccountResource(t *testing.T) {
 				GUID:              saGuid,
 				Region:            region,
 				Subdomain:         subdomain,
-				CreatedBy:         createdBy,
 				GlobalAccountGUID: gaGuid,
 				ParentGUID:        dirGuid,
 				Description:       description,
@@ -86,6 +98,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 				BetaEnabled:       betaEnabled,
 				Labels:            labels,
 			},
+			admins: admins,
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Subaccount{
 					TypeMeta: metav1.TypeMeta{
@@ -106,7 +119,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							DisplayName:       displayName,
 							Region:            region,
 							Subdomain:         subdomain,
-							SubaccountAdmins:  []string{createdBy},
+							SubaccountAdmins:  admins,
 							GlobalAccountGuid: gaGuid,
 							DirectoryGuid:     dirGuid,
 							Description:       description,
@@ -123,8 +136,8 @@ func TestConvertSubaccountResource(t *testing.T) {
 				GUID:      saGuid,
 				Region:    region,
 				Subdomain: subdomain,
-				CreatedBy: createdBy,
 			},
+			admins: admins,
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
 					&v1alpha1.Subaccount{
@@ -145,7 +158,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							ForProvider: v1alpha1.SubaccountParameters{
 								Region:           region,
 								Subdomain:        subdomain,
-								SubaccountAdmins: []string{createdBy},
+								SubaccountAdmins: admins,
 							},
 						},
 					})
@@ -159,8 +172,8 @@ func TestConvertSubaccountResource(t *testing.T) {
 				DisplayName: displayName,
 				Region:      region,
 				Subdomain:   subdomain,
-				CreatedBy:   createdBy,
 			},
+			admins: admins,
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
 					&v1alpha1.Subaccount{
@@ -182,7 +195,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 								DisplayName:      displayName,
 								Region:           region,
 								Subdomain:        subdomain,
-								SubaccountAdmins: []string{createdBy},
+								SubaccountAdmins: admins,
 							},
 						},
 					})
@@ -196,8 +209,8 @@ func TestConvertSubaccountResource(t *testing.T) {
 				DisplayName: displayName,
 				GUID:        saGuid,
 				Subdomain:   subdomain,
-				CreatedBy:   createdBy,
 			},
+			admins: admins,
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
 					&v1alpha1.Subaccount{
@@ -218,7 +231,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							ForProvider: v1alpha1.SubaccountParameters{
 								DisplayName:      displayName,
 								Subdomain:        subdomain,
-								SubaccountAdmins: []string{createdBy},
+								SubaccountAdmins: admins,
 							},
 						},
 					})
@@ -232,8 +245,8 @@ func TestConvertSubaccountResource(t *testing.T) {
 				DisplayName: displayName,
 				GUID:        saGuid,
 				Region:      region,
-				CreatedBy:   createdBy,
 			},
+			admins: admins,
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
 					&v1alpha1.Subaccount{
@@ -254,7 +267,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							ForProvider: v1alpha1.SubaccountParameters{
 								DisplayName:      displayName,
 								Region:           region,
-								SubaccountAdmins: []string{createdBy},
+								SubaccountAdmins: admins,
 							},
 						},
 					})
@@ -263,13 +276,14 @@ func TestConvertSubaccountResource(t *testing.T) {
 			}(),
 		},
 		{
-			name: "missing createdBy",
+			name: "missing admins",
 			sa: &btpcli.Subaccount{
 				DisplayName: displayName,
 				GUID:        saGuid,
 				Region:      region,
 				Subdomain:   subdomain,
 			},
+			admins: nil,
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
 					&v1alpha1.Subaccount{
@@ -291,11 +305,11 @@ func TestConvertSubaccountResource(t *testing.T) {
 								DisplayName:      displayName,
 								Region:           region,
 								Subdomain:        subdomain,
-								SubaccountAdmins: []string{""},
+								SubaccountAdmins: []string{},
 							},
 						},
 					})
-				rwc.AddComment(warnMissingCreatedBy)
+				rwc.AddComment(warnMissingAdmins)
 				return rwc
 			}(),
 		},
@@ -306,10 +320,10 @@ func TestConvertSubaccountResource(t *testing.T) {
 				GUID:              saGuid,
 				Region:            region,
 				Subdomain:         subdomain,
-				CreatedBy:         createdBy,
 				GlobalAccountGUID: gaGuid,
 				ParentGUID:        gaGuid,
 			},
+			admins: admins,
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Subaccount{
 					TypeMeta: metav1.TypeMeta{
@@ -330,7 +344,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							DisplayName:       displayName,
 							Region:            region,
 							Subdomain:         subdomain,
-							SubaccountAdmins:  []string{createdBy},
+							SubaccountAdmins:  admins,
 							GlobalAccountGuid: gaGuid,
 						},
 					},
@@ -343,8 +357,8 @@ func TestConvertSubaccountResource(t *testing.T) {
 				GUID:        saGuid,
 				Region:      region,
 				Subdomain:   subdomain,
-				CreatedBy:   createdBy,
 			},
+			admins: admins,
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Subaccount{
 					TypeMeta: metav1.TypeMeta{
@@ -365,7 +379,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							DisplayName:      displayNameSpecial,
 							Region:           region,
 							Subdomain:        subdomain,
-							SubaccountAdmins: []string{createdBy},
+							SubaccountAdmins: admins,
 						},
 					},
 				}),
@@ -377,8 +391,8 @@ func TestConvertSubaccountResource(t *testing.T) {
 				GUID:        empty,
 				Region:      empty,
 				Subdomain:   empty,
-				CreatedBy:   empty,
 			},
+			admins: nil,
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
 					&v1alpha1.Subaccount{
@@ -397,7 +411,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 							},
 							ForProvider: v1alpha1.SubaccountParameters{
-								SubaccountAdmins: []string{""},
+								SubaccountAdmins: []string{},
 							},
 						},
 					})
@@ -405,7 +419,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 				rwc.AddComment(warnMissingGuid)
 				rwc.AddComment(warnMissingRegion)
 				rwc.AddComment(warnMissingSubdomain)
-				rwc.AddComment(warnMissingCreatedBy)
+				rwc.AddComment(warnMissingAdmins)
 				return rwc
 			}(),
 		},
@@ -413,10 +427,11 @@ func TestConvertSubaccountResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertSubaccountResource(&subaccount{
+			result := convertSubaccountResource(context.Background(), nil, &subaccount{
 				Subaccount:          tt.sa,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
-			})
+				Admins:              tt.admins,
+			}, &stubEventHandler{}, false)
 			r.NotNil(result)
 
 			// Verify comments.
