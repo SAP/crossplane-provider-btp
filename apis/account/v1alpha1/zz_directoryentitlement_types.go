@@ -27,8 +27,8 @@ import (
 
 type DirectoryEntitlementInitParameters struct {
 
-	// (Number) The quota assigned to the directory.
-	// The quota assigned to the directory.
+	// (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+	// The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
 	Amount *float64 `json:"amount,omitempty" tf:"amount,omitempty"`
 
 	// (Boolean) Determines whether the plans of entitlements that have a numeric quota with the amount specified in auto_distribute_amount are automatically allocated to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, it shows if the plan are assigned to any new subaccount that is added to the directory in the future (auto_distribute_amount is not needed). If the distribute parameter is set, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory.
@@ -74,8 +74,8 @@ type DirectoryEntitlementInitParameters struct {
 
 type DirectoryEntitlementObservation struct {
 
-	// (Number) The quota assigned to the directory.
-	// The quota assigned to the directory.
+	// (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+	// The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
 	Amount *float64 `json:"amount,omitempty" tf:"amount,omitempty"`
 
 	// (Boolean) Determines whether the plans of entitlements that have a numeric quota with the amount specified in auto_distribute_amount are automatically allocated to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, it shows if the plan are assigned to any new subaccount that is added to the directory in the future (auto_distribute_amount is not needed). If the distribute parameter is set, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory.
@@ -130,8 +130,8 @@ type DirectoryEntitlementObservation struct {
 
 type DirectoryEntitlementParameters struct {
 
-	// (Number) The quota assigned to the directory.
-	// The quota assigned to the directory.
+	// (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+	// The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
 	// +kubebuilder:validation:Optional
 	Amount *float64 `json:"amount,omitempty" tf:"amount,omitempty"`
 
