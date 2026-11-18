@@ -28,6 +28,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Cloud Foundry Environment](#cloud-foundry-environment)
   - [Kyma Environment](#kyma-environment)
   - [Service Binding](#service-binding)
+  - [Role Collection](#role-collection)
 - [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy)
 - [Usage Examples](#usage-examples)
   - [Building the Exporter](#building-the-exporter)
@@ -40,6 +41,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
 - [Known Limitations](#known-limitations)
   - [`spec.forProvider.parameters` Is Always Null](#specforproviderparameters-is-always-null)
   - [`spec.forProvider.shared` Cannot Be Retrieved](#specforprovidershared-cannot-be-retrieved)
+  - [Role Collection xsuaa Credentials Are Not Exported](#role-collection-xsuaa-credentials-are-not-exported)
 - [Troubleshooting](#troubleshooting)
   - [Authentication Issues](#authentication-issues)
   - [Missing BTP CLI](#missing-btp-cli)
@@ -536,6 +538,49 @@ Exports BTP service bindings from subaccounts.
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind servicebinding -o output.yaml
 ```
 
+---
+
+### Role Collection
+
+Exports BTP role collections from the selected subaccount(s).
+
+**Kind name:** `role-collection`
+
+**CLI flag:** `--role-collection <value>`
+
+**Selection criteria:**
+- Regex expression matching the role collection name
+
+> [!NOTE]
+> Role collections are enumerated from the subaccounts selected via
+> `--subaccount` (the single entrypoint for an export). A role collection has no
+> GUID of its own — its name is only unique within its parent subaccount — so
+> selection is by name regex rather than by ID. When `--role-collection` is
+> omitted, the exporter lets you choose interactively which role collections of
+> the selected subaccount(s) to export.
+
+**Notes:**
+- The exported `RoleCollection` carries its role references in
+  `spec.forProvider.roleReferences`, resolved from the source role collection.
+- xsuaa credentials for the parent subaccount are **not** exported. The resource
+  is emitted with an empty `subaccountApiCredentialRef` and a TODO warning
+  comment; you must supply credentials before applying it. See
+  [Role Collection xsuaa Credentials Are Not Exported](#role-collection-xsuaa-credentials-are-not-exported).
+
+**Example:**
+```bash
+# Export all role collections from a subaccount
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind role-collection \
+  --subaccount <subaccount-id>
+
+# Export role collections matching a pattern
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind role-collection \
+  --subaccount <subaccount-id> \
+  --role-collection '.*Administrator.*'
+```
+
 ## Scope Selection and Directory Hierarchy
 
 The **subaccount is the single entrypoint** for an export. The `--subaccount`
@@ -666,6 +711,14 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
   --kind subaccount,cloudfoundry-environment \
   --resolve-references \
   -o output.yaml
+
+# Export a directory subtree as CRs: the directory and its sub-directories plus
+# every descendant subaccount, with the hierarchy resolved via references
+go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
+  --kind subaccount,directory \
+  --subaccount <directory-guid> \
+  --resolve-references \
+  -o output.yaml
 ```
 
 ### Output to File
@@ -740,6 +793,20 @@ The `spec.forProvider.parameters` field is always exported as `null`. The BTP CL
 The `spec.forProvider.shared` field cannot be populated during export. The BTP CLI does not expose whether a service instance is shared.
 
 **Workaround:** Review the exported manifests and manually set the `shared` field to the correct value before applying the manifests to the cluster.
+
+---
+
+### Role Collection xsuaa Credentials Are Not Exported
+
+**Affected kinds:** `role-collection`
+
+A `RoleCollection` needs xsuaa credentials for its parent subaccount to be reconciled, supplied **either** inline via `spec.apiCredentials` **or** by reference via `spec.subaccountApiCredentialRef` (pointing at a `SubaccountApiCredential` resource). Exactly one of the two is required. The exporter emits neither: the source system does not expose the credentials, and the referenced `SubaccountApiCredential` resource is not itself exported. The resource is therefore emitted with an empty `subaccountApiCredentialRef` and a TODO warning comment.
+
+**Workaround:** Before applying the manifest (and before changing the management policy away from `Observe`), supply the credentials in one of two ways:
+- set `spec.apiCredentials` with a credential source and selectors for the subaccount, or
+- create a `SubaccountApiCredential` (with `readOnly: false`) for the subaccount and point `spec.subaccountApiCredentialRef.name` at it.
+
+Leaving both unset makes the resource fail to reconcile.
 
 ---
 

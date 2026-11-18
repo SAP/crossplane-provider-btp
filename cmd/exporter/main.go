@@ -19,6 +19,7 @@ import (
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directoryentitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/kymaenvironment"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/rolecollection"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebinding"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
