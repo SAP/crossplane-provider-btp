@@ -44,7 +44,7 @@ func TestConvertRoleCollectionResource(t *testing.T) {
 			wantComments: []string{"TODO: provide xsuaa credentials"},
 		},
 		{
-			name:         "empty description still exported",
+			name:         "empty description left nil",
 			rcName:       "no-desc",
 			parentGUID:   "sa-one",
 			externalName: "no-desc",
@@ -76,7 +76,6 @@ func TestConvertRoleCollectionResource(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			subaccount.Reset()
 			t.Cleanup(subaccount.Reset)
-			btpClient := btpcli.NewClient(fakeBTPCLI(t))
 
 			rc := &rolecollection{
 				roleCollection: &btpcli.RoleCollection{
@@ -88,15 +87,19 @@ func TestConvertRoleCollectionResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			}
 
-			result := convertRoleCollectionResource(t.Context(), btpClient, rc)
+			result := convertRoleCollectionResource(t.Context(), rc)
 			cr := result.Resource().(*v1alpha1.RoleCollection)
 
 			require.Equal(t, v1alpha1.RoleCollectionKind, cr.Kind)
 			require.Equal(t, "security.btp.sap.crossplane.io/v1alpha1", cr.APIVersion)
 			require.Equal(t, tt.externalName, cr.Annotations["crossplane.io/external-name"])
 			require.Equal(t, tt.resourceName, cr.Name)
-			require.Equal(t, tt.resourceName, cr.Spec.ForProvider.Name)
-			require.Equal(t, tt.description, *cr.Spec.ForProvider.Description)
+			require.Equal(t, tt.rcName, cr.Spec.ForProvider.Name)
+			if tt.description == "" {
+				require.Nil(t, cr.Spec.ForProvider.Description)
+			} else {
+				require.Equal(t, tt.description, *cr.Spec.ForProvider.Description)
+			}
 			require.Equal(t, tt.roleReferences, cr.Spec.ForProvider.RoleReferences)
 			require.Equal(t, xpv1.ManagementPolicies{xpv1.ManagementActionObserve}, cr.Spec.ManagementPolicies)
 			require.Equal(t, &xpv1.Reference{Name: ""}, cr.Spec.SubaccountApiCredentialRef)

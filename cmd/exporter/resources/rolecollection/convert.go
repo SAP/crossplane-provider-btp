@@ -6,24 +6,29 @@ import (
 	"github.com/SAP/xp-clifford/yaml"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func convertRoleCollectionResource(ctx context.Context, btpClient *btpcli.BtpCli, rc *rolecollection) *yaml.ResourceWithComment {
+func convertRoleCollectionResource(ctx context.Context, rc *rolecollection) *yaml.ResourceWithComment {
 	resourceName := rc.GenerateK8sResourceName()
 	externalName := rc.GetExternalName()
-	description := rc.roleCollection.Description
 	roleReferences := rc.roleCollection.RoleReferences
+
+	// Leave Description nil when empty so omitempty drops it from the emitted
+	// YAML rather than writing an explicit `description: ""`.
+	var description *string
+	if rc.roleCollection.Description != "" {
+		description = &rc.roleCollection.Description
+	}
 
 	spec := v1alpha1.RoleCollectionSpec{
 		ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 			ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve},
 		},
 		ForProvider: v1alpha1.RoleCollectionParameters{
-			Name:           resourceName,
-			Description:    &description,
+			Name:           rc.roleCollection.Name,
+			Description:    description,
 			RoleReferences: roleReferences,
 		},
 	}

@@ -52,7 +52,7 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	}
 
 	for _, rc := range cache.All() {
-		eventHandler.Resource(convertRoleCollectionResource(ctx, btpClient, rc))
+		eventHandler.Resource(convertRoleCollectionResource(ctx, rc))
 	}
 
 	return nil
