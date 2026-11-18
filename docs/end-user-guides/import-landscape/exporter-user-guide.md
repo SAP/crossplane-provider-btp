@@ -21,11 +21,13 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Subaccount](#subaccount)
   - [Subaccount Trust Configuration](#subaccount-trust-configuration)
   - [Subscription](#subscription)
+  - [Directory](#directory)
   - [Entitlement](#entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
   - [Kyma Environment](#kyma-environment)
   - [Service Binding](#service-binding)
+- [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy)
 - [Usage Examples](#usage-examples)
   - [Building the Exporter](#building-the-exporter)
   - [Interactive Mode](#interactive-mode)
@@ -237,7 +239,14 @@ Exports BTP subaccount resources.
 
 **Selection criteria:**
 - BTP subaccount ID (exact match)
-- Regex expression matching subaccount display name
+- Regex expression matching a subaccount display name
+
+> [!NOTE]
+> The `--subaccount` flag selects from the list of **authorized subaccounts**.
+> The subaccount is the single entrypoint for an export; the directories above
+> the selected subaccount are derived automatically from the global account
+> hierarchy. See [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy)
+> for details.
 
 **Example:**
 ```bash
@@ -314,8 +323,55 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
   --kind subscription \
   --subaccount <subaccount-id> \
-  --subscription '.*' \
+  --subscription '.*'
+```
+
+### Directory
+
+Exports the BTP directories **above** the selected subaccount(s), preserving the
+parent/child hierarchy.
+
+**Kind name:** `directory`
+
+**CLI flag:** `--directory <value>` (optional)
+
+**Selection criteria:**
+- The candidate set is always **derived** from the selected subaccount(s): for
+  each selected subaccount, the exporter walks the global account hierarchy
+  upward and collects every ancestor directory between the subaccount and the
+  global account.
+- `--directory` optionally **narrows** that derived set. A value matches a
+  derived directory by:
+  - BTP directory GUID (exact match), or
+  - a regex expression matching a directory display name.
+- When `--directory` is omitted, every derived ancestor directory is exported.
+  The flag never prompts: the subaccount is the single entrypoint, so directories
+  outside the selected subaccount's ancestry are never pulled in.
+
+**Notes:**
+- Given the hierarchy `dir1 → dir2`, `{dir3 → sa1}`, selecting `sa1` exports
+  `sa1` and its ancestor directory `dir3` (and `dir3`'s ancestors, if any). When
+  several subaccounts are selected, their ancestor directories are deduplicated.
+- Because `--directory` only filters the derived ancestors, a value that matches
+  no ancestor of the selected subaccount(s) yields no directories (not an error).
+- The directory hierarchy is preserved: when `--resolve-references` is set, a
+  directory whose parent is another **exported** directory references that
+  parent's resource name via `directoryRef`. Directories parented directly by
+  the global account carry no `directoryRef`.
+
+**Example:**
+```bash
+# Export a subaccount together with all its ancestor directories, references resolved
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind subaccount,directory \
+  --subaccount <subaccount-guid> \
   --resolve-references
+
+# Narrow the exported directories to a single ancestor (by GUID or name regex)
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind directory \
+  --subaccount <subaccount-guid> \
+  --directory <directory-guid-or-name-regex>
 ```
 
 ---
@@ -446,6 +502,64 @@ Exports BTP service bindings from subaccounts.
 # Export service bindings interactively to a file
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind servicebinding -o output.yaml
 ```
+
+## Scope Selection and Directory Hierarchy
+
+The **subaccount is the single entrypoint** for an export. The `--subaccount`
+flag selects from the list of authorized subaccounts; the directories above the
+selected subaccount are then **derived** from the global account hierarchy. The
+`directory` kind has no entrypoint selector of its own — the optional
+`--directory` flag only narrows the derived ancestors (see
+[Directory](#directory)); it never selects directories outside the selected
+subaccount's ancestry.
+
+**Upward derivation.** For each selected subaccount, the exporter walks the
+global account hierarchy *upward*, collecting every ancestor directory between
+the subaccount and the global account. Given this hierarchy:
+
+```
+Global Account
+├─ Subaccount-A
+└─ Dir-1
+   ├─ Subaccount-B
+   └─ Dir-1_1
+      ├─ Subaccount-C
+      └─ Subaccount-D
+```
+
+selecting `Subaccount-C` derives the ancestor directories `Dir-1_1` and `Dir-1`.
+Selecting `Subaccount-A` derives no directories (it is parented directly by the
+global account). When several subaccounts are selected, their ancestor
+directories are deduplicated, so each directory is exported exactly once.
+
+**What each kind exports from the selection:**
+- `--kind subaccount` emits a `Subaccount` CR for every selected subaccount.
+- `--kind directory` emits a `Directory` CR for every derived ancestor directory,
+  optionally narrowed by `--directory` (see [Directory](#directory)).
+
+To capture the subaccount together with its directory chain as CRs, request both
+kinds together: `--kind subaccount,directory`.
+
+**Hierarchy preservation (with `--resolve-references`).** Parent relationships
+are resolved to Kubernetes resource-name references among the exported set:
+
+- A `Directory` whose parent is another exported directory gets a `directoryRef`
+  pointing at the parent `Directory` CR.
+- A `Subaccount` whose parent is a derived directory gets a `directoryRef`
+  pointing at that `Directory` CR.
+- Entities parented directly by the global account carry no `directoryRef`.
+
+> [!NOTE]
+> Because directories are derived from the selected subaccount, the full ancestor
+> chain is part of the exported set when `--kind directory` is included **and**
+> `--directory` is not used to narrow it, so parent references resolve. If you
+> narrow the set with `--directory` and drop a directory that is the parent of
+> another exported directory, that child's `directoryRef` cannot resolve and the
+> resource is emitted with a warning comment instead. If you export
+> `--kind subaccount` on its own (without `directory`), a subaccount's
+> `directoryRef` still resolves to the ancestor directory's resource name even
+> though no `Directory` CR is emitted; add `--kind directory` if you also want
+> those `Directory` CRs in the output.
 
 ## Usage Examples
 

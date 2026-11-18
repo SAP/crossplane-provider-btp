@@ -28,10 +28,17 @@ func (c *BtpCli) GetSubaccountAdmins(ctx context.Context, subaccountID string) (
 		return nil, err
 	}
 
-	// Only page 1 (up to 500 users) is handled; more than 500 subaccount admins is not expected.
-	admins := make([]string, 0, len(response.Items))
-	seen := make(map[string]struct{}, len(response.Items))
-	for _, u := range response.Items {
+	return dedupRoleCollectionEmails(response.Items), nil
+}
+
+// dedupRoleCollectionEmails extracts the unique, non-empty e-mail addresses from role
+// collection user assignments, preserving order.
+//
+// Only page 1 (up to 500 users) is handled; more than 500 admins is not expected.
+func dedupRoleCollectionEmails(items []RoleCollectionUser) []string {
+	admins := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, u := range items {
 		// The accounts API expects e-mails for multi-environment subaccounts, so prefer
 		// the email. Fall back to username for entries without one (e.g. technical users)
 		// or for the default identity provider where username already is the e-mail.
@@ -46,7 +53,7 @@ func (c *BtpCli) GetSubaccountAdmins(ctx context.Context, subaccountID string) (
 		admins = append(admins, admin)
 	}
 
-	return admins, nil
+	return admins
 }
 
 type SubaccountsResponse struct {

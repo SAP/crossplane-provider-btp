@@ -25,6 +25,17 @@ func init() {
 	resources.RegisterKind(exporter{})
 }
 
+// Reset clears the memoized subaccount cache. Intended for tests.
+func Reset() {
+	subaccountCache = nil
+}
+
+// Param exposes the subaccount selector so tests (and other callers) can bind
+// it without constructing an exporter.
+func Param() configparam.ConfigParam {
+	return subaccountParam
+}
+
 type exporter struct{}
 
 var _ resources.Kind = exporter{}
@@ -37,7 +48,7 @@ func (e exporter) KindName() string {
 	return subaccountParam.GetName()
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, _ resources.Options) error {
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) error {
 	cache, err := Get(ctx, btpClient)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with subaccounts: %w", err)
@@ -48,7 +59,7 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 		eventHandler.Warn(fmt.Errorf("no subaccounts found"))
 	} else {
 		for _, sa := range cache.All() {
-			eventHandler.Resource(convertSubaccountResource(sa))
+			eventHandler.Resource(convertSubaccountResource(ctx, btpClient, sa, eventHandler, options.ResolveReferences))
 		}
 	}
 
@@ -60,7 +71,8 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		return subaccountCache, nil
 	}
 
-	// Retrieve all subaccounts.
+	// Retrieve all authorized subaccounts. The subaccount is the single
+	// entrypoint for an export; directories are derived from the selection.
 	originals, err := btpClient.ListSubaccounts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get subaccounts: %w", err)
@@ -70,6 +82,7 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	// Wrap subaccounts for internal processing and caching.
 	var subaccounts []*subaccount
 	for _, sa := range originals {
+		sa := sa
 		subaccounts = append(subaccounts, &subaccount{
 			Subaccount:          &sa,
 			ResourceWithComment: yaml.NewResourceWithComment(nil),
