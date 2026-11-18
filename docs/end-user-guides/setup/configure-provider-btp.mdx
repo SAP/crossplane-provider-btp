@@ -216,7 +216,7 @@ same `cis-provider-secret`, using namespace `default` and key `data`.
     ```
   </TabItem>
   <TabItem value="manually" label="Manually">
- 1. Copy the following YAML content and replace the value of `stringData.data` with the credentials from your SAP Cloud Management service binding.
+ 1. Copy the following YAML content.
 
       - If you followed the steps in [Set up SAP Cloud Management service](#set-up-sap-cloud-management-service), the binding credentials should already be copied to your clipboard.<br/>
       <br/>
@@ -229,7 +229,7 @@ same `cis-provider-secret`, using namespace `default` and key `data`.
           name: cis-provider-secret
       type: Opaque
       stringData:
-          data: |
+          data: | # Replace the entire JSON below with your CIS service binding credentials.
               {
                 "endpoints": {
                   "accounts_service_url": "...",
@@ -342,19 +342,13 @@ You can create a `Secret` using the technical user _(P-user)_ credentials.
         name: sa-provider-secret
     type: Opaque
     stringData:
-        credentials: |
+        credentials: | # Replace the email, username and password below with your technical-user credentials.
             {
               "email": "<technical-user-email>",
               "username": "<technical-user-username>",
               "password": "<technical-user-password>"
             }
     ```
-
-    Replace the following:
-
-    - `<technical-user-email>`: The email address of the technical user
-    - `<technical-user-username>`: The username of the technical user
-    - `<technical-user-password>`: The password of the technical user
 
     :::note Differences in BTP landscapes
 
@@ -498,18 +492,17 @@ the same IAS identity. CF operations also require the appropriate CF roles/origi
 #### 4. Mount the provider's token
 
 On the **provider's control plane**, save the following as `runtime-config.yaml`.
-Replace `IAS_ISSUER`, the ServiceAccount name and `WORKLOAD_IDENTITY_VERSION` with
-your own values. The ServiceAccount must match the NameID mapping above.
 
-```yaml title="runtime-config.yaml"
+```yaml title="runtime-config.yaml" {9,26,35}
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
   name: provider-btp-workload
 spec:
+  # Merge with existing runtime settings; retain the Kubernetes API token.
   serviceAccountTemplate:
     metadata:
-      name: provider-btp
+      name: provider-btp # Set your ServiceAccount name; it must match the IAS NameID mapping in step 2.
   deploymentTemplate:
     spec:
       selector: {}
@@ -519,14 +512,14 @@ spec:
             - name: package-runtime
               volumeMounts:
                 - name: workload-assertion
-                  mountPath: /var/run/secrets/workload
+                  mountPath: /var/run/secrets/workload # Mount the directory without subPath so token rotation stays visible.
                   readOnly: true
           volumes:
             - name: workload-assertion
               projected:
                 sources:
                   - serviceAccountToken:
-                      audience: IAS_ISSUER
+                      audience: IAS_ISSUER # Replace with the exact issuer from your IAS OIDC discovery document, not CLUSTER_ISSUER.
                       expirationSeconds: 600
                       path: token
 ---
@@ -535,14 +528,12 @@ kind: Provider
 metadata:
   name: provider-btp
 spec:
-  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:WORKLOAD_IDENTITY_VERSION
+  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:WORKLOAD_IDENTITY_VERSION # Set a provider version that supports workload identity.
   runtimeConfigRef:
     name: provider-btp-workload
 ```
 
-Preserve existing runtime settings and the Kubernetes API token when adapting
-your installation. Mount the additional token's directory without `subPath` so
-rotation remains visible. For an operator-managed installation, update its owning
+For an operator-managed installation, update its owning
 configuration rather than overwriting generated resources.
 
 ```sh title="Run in Terminal"
@@ -561,14 +552,14 @@ We now have everything in place to create the `ProviderConfig`.
 
 Reference the CIS binding Secret and the technical-user credentials Secret.
 
-```yaml title="config.yaml" {6}
+```yaml title="config.yaml" {6-7}
 apiVersion: btp.sap.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
   name: account-provider-config
 spec:
-  globalAccount: <global-account-subdomain>
-  cliServerUrl: https://cli.btp.cloud.sap
+  globalAccount: <global-account-subdomain> # Set the subdomain of the global account containing your CIS binding.
+  cliServerUrl: https://cli.btp.cloud.sap # Change if your BTP landscape uses a different CLI server URL.
   cisCredentials:
     source: Secret
     secretRef:
@@ -583,25 +574,18 @@ spec:
       key: credentials
 ```
 
-Replace `<global-account-subdomain>` with the subdomain of your BTP global account.
-It must be the same global account whose subaccount holds the Cloud Management
-service binding referenced in `cisCredentials`. Adjust `cliServerUrl` if your
-landscape uses a different CLI server URL.
-
   </TabItem>
   <TabItem value="ias-oidc" label="IAS trusted OIDC">
 
 Reference the same CIS binding Secret and configure the projected workload token.
-Do **not** set `serviceAccountSecret`; workload mode rejects mixed password inputs.
-The CIS binding must use `client_credentials`, as created in the shared setup.
 
-```yaml title="config.yaml"
+```yaml title="config.yaml" {6,15-17}
 apiVersion: btp.sap.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
   name: account-provider-config
 spec:
-  globalAccount: GA_SUBDOMAIN
+  globalAccount: GA_SUBDOMAIN     # Set the subdomain of the global account containing your CIS binding.
   cliServerUrl: "https://cli.btp.cloud.sap"
   cisCredentials:
     source: Secret
@@ -610,19 +594,10 @@ spec:
       name: cis-provider-secret
       key: data
   workloadIdentity:
-    tokenFile: /var/run/secrets/workload/token
-    identityProvider: BTP_ORIGIN
-    userEmail: WORKLOAD_EMAIL
+    tokenFile: /var/run/secrets/workload/token # Must match mountPath + token path of DeploymentRuntimeConfig
+    identityProvider: BTP_ORIGIN               # Set the exact IAS Origin Key from BTP platform trust
+    userEmail: WORKLOAD_EMAIL                  # Set the IAS user's Email / Login Name; must equal the NameID mapping result.
 ```
-
-Replace `GA_SUBDOMAIN` with the subdomain of the global account containing your
-CIS binding. Adjust `cliServerUrl` if your landscape uses a different CLI server.
-Use the exact `BTP_ORIGIN` and `WORKLOAD_EMAIL` from
-the IAS/BTP setup. The `tokenFile` path must match the runtime mount from step 4.
-
-This configuration needs only `tokenFile`, `identityProvider` and `userEmail`
-under `workloadIdentity`. Keep the CIS binding Secret; no user password or IAS
-client secret is added.
 
 
   </TabItem>
