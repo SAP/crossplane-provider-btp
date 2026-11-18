@@ -1,6 +1,6 @@
 module github.com/sap/crossplane-provider-btp
 
-go 1.25.6
+go 1.26
 
 tool golang.org/x/tools/cmd/goimports
 
@@ -40,7 +40,7 @@ require (
 	k8s.io/apimachinery v0.35.7
 	k8s.io/client-go v0.35.7
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
+	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
 	sigs.k8s.io/controller-runtime v0.20.4
 	sigs.k8s.io/controller-tools v0.20.1
 	sigs.k8s.io/e2e-framework v0.6.0
