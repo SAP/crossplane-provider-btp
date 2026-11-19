@@ -29,10 +29,12 @@ func TestTrustConfigurationSelection(t *testing.T) {
 		selectAll bool
 		wantIDs   []string
 	}{
-		{name: "all includes default and read-only trusts", selectAll: true, wantIDs: []string{"sa-one/custom", "sa-one/sap.default", "sa-two/custom", "sa-two/sap.default"}},
-		{name: "origin regex", selector: []string{"^custom$"}, wantIDs: []string{"sa-one/custom", "sa-two/custom"}},
-		{name: "compound ID", selector: []string{"sa-two/custom"}, wantIDs: []string{"sa-two/custom"}},
-		{name: "interactive display value", selector: []string{"custom - [sa-one/custom]"}, wantIDs: []string{"sa-one/custom"}},
+		{name: "all excludes trusts inherited from the global account", selectAll: true, wantIDs: []string{"sa-one/sa-native", "sa-two/sa-native"}},
+		{name: "origin regex", selector: []string{"^sa-native$"}, wantIDs: []string{"sa-one/sa-native", "sa-two/sa-native"}},
+		{name: "compound ID", selector: []string{"sa-two/sa-native"}, wantIDs: []string{"sa-two/sa-native"}},
+		{name: "interactive display value", selector: []string{"sa-native - [sa-one/sa-native]"}, wantIDs: []string{"sa-one/sa-native"}},
+		{name: "inherited global trust is excluded", selector: []string{"custom"}},
+		{name: "built-in platform trust is excluded", selector: []string{"sap.default"}},
 		{name: "no match", selector: []string{"missing"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,7 +51,7 @@ func TestTrustConfigurationSelection(t *testing.T) {
 
 	// Resolve references through the actual selected subaccount cache.
 	trustCache = nil
-	viper.Set(KindName, []string{"custom"})
+	viper.Set(KindName, []string{"sa-native"})
 	handler := &recordingHandler{}
 	require.NoError(t, exporter{}.Export(t.Context(), client, handler, resources.Options{ResolveReferences: true}))
 	require.Empty(t, handler.warnings)
@@ -77,16 +79,30 @@ func fakeBTPCLI(t *testing.T) string {
 	path := filepath.Join(t.TempDir(), "btp")
 	require.NoError(t, os.WriteFile(path, []byte(`#!/bin/sh
 case "$*" in
+  "target --global-account")
+    ;;
   "--format json list accounts/subaccount --authorized")
     echo '{"value":[{"guid":"sa-one","displayName":"First","region":"eu10"},{"guid":"sa-two","displayName":"Second","region":"eu10"}]}'
+    ;;
+  "--format json list security/trust")
+    cat <<'JSON'
+[
+  {"originKey":"custom", "name":"Custom trust", "identityProvider":"tenant.example.com",
+   "availableForUserLogon":"false", "createShadowUsersDuringLogon":"true"},
+  {"originKey":"sap.default", "name":"sap.default", "identityProvider":null,
+   "availableForUserLogon":"true", "createShadowUsersDuringLogon":"false"}
+]
+JSON
     ;;
   "--format json list security/trust --subaccount sa-one"|"--format json list security/trust --subaccount sa-two")
     cat <<'JSON'
 [
   {"originKey":"custom", "name":"Custom trust", "identityProvider":"tenant.example.com",
    "availableForUserLogon":"false", "createShadowUsersDuringLogon":"true", "readOnly":true},
-  {"originKey":"sap.default", "name":"sap.default", "identityProvider":null,
-   "availableForUserLogon":"true", "createShadowUsersDuringLogon":"false"}
+  {"originKey":"sap.default", "name":"sap.default", "identityProvider":"sap.default.example.com",
+   "defaultIdp":true, "availableForUserLogon":"true", "createShadowUsersDuringLogon":"false"},
+  {"originKey":"sa-native", "name":"Subaccount trust", "identityProvider":"tenant.example.com",
+   "availableForUserLogon":"true", "createShadowUsersDuringLogon":"true"}
 ]
 JSON
     ;;

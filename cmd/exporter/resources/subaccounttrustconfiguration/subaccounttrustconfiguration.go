@@ -57,6 +57,14 @@ func Get(ctx context.Context, client *btpcli.BtpCli, options resources.Options) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve subaccount cache: %w", err)
 	}
+	// Trusts established at the global account are inherited (read-only) by every
+	// subaccount and appear in the per-subaccount list too. Exclude them here so a
+	// trust is exported exactly once at its true scope: global trusts are exported as
+	// GlobalaccountTrustConfiguration, and only subaccount-native trusts remain here.
+	globalOrigins, err := client.GlobalaccountTrustOrigins(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list global account trust configurations: %w", err)
+	}
 	cache := resources.NewResourceCache[*trustConfiguration]()
 	for _, subaccountID := range subaccounts.AllIDs() {
 		trusts, err := client.ListSubaccountTrustConfigurations(ctx, subaccountID)
@@ -64,6 +72,16 @@ func Get(ctx context.Context, client *btpcli.BtpCli, options resources.Options) 
 			return nil, fmt.Errorf("failed to list trust configurations for subaccount %s: %w", subaccountID, err)
 		}
 		for _, trust := range trusts {
+			if btpcli.IsPlatformTrust(trust) {
+				slog.DebugContext(ctx, "Skipping built-in platform trust",
+					"subaccount", subaccountID, "origin", trust.OriginKey)
+				continue
+			}
+			if _, inherited := globalOrigins[trust.OriginKey]; inherited {
+				slog.DebugContext(ctx, "Skipping trust inherited from global account",
+					"subaccount", subaccountID, "origin", trust.OriginKey)
+				continue
+			}
 			cache.Set(&trustConfiguration{
 				TrustConfiguration:  &trust,
 				SubaccountID:        subaccountID,
