@@ -15,9 +15,12 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/cfenvironment"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directory"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directoryentitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/globalaccounttrustconfiguration"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/kymaenvironment"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/rolecollection"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebinding"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
@@ -80,7 +83,8 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	btpClient := btpcli.NewClient(paramBtpCliPath.Value())
 
 	// Select the source subaccount before asking which resource kinds to export.
-	// Other exporters reuse this cached selection.
+	// The subaccount is the single export entrypoint; directories above it are
+	// derived from the selection. Other exporters reuse this cached selection.
 	selectedSubaccountCount, err := getSelectedSubaccountCount(ctx, btpClient)
 	if err != nil {
 		return erratt.Errorf("cannot retrieve and select subaccounts: %w", err)
@@ -161,8 +165,9 @@ func exportAllConflictFlagName(paramName string) (string, bool) {
 		return "--kind", true
 	}
 	for _, kind := range resources.KindNames() {
-		// The subaccount selector identifies the source subaccount for an
-		// export-all operation; it does not filter which kinds are exported.
+		// The subaccount selector identifies the export scope (the source
+		// subaccount) for an export-all operation; it does not filter which kinds
+		// are exported.
 		if kind == paramName && kind != "subaccount" {
 			return "--" + kind, true
 		}
