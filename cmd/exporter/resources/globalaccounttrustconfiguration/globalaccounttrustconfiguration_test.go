@@ -82,8 +82,8 @@ case "$*" in
    "availableForUserLogon":"false", "createShadowUsersDuringLogon":"true"},
   {"originKey":"other", "name":"Other trust", "identityProvider":"other.example.com",
    "availableForUserLogon":"true", "createShadowUsersDuringLogon":"true"},
-  {"originKey":"sap.default", "name":"sap.default", "identityProvider":null,
-   "availableForUserLogon":"true", "createShadowUsersDuringLogon":"false"}
+  {"originKey":"sap.default", "name":"sap.default", "identityProvider":"sap.default.example.com",
+   "defaultIdp":true, "availableForUserLogon":"true", "createShadowUsersDuringLogon":"false"}
 ]
 JSON
     ;;

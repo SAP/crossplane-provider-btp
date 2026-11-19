@@ -99,8 +99,8 @@ JSON
 [
   {"originKey":"custom", "name":"Custom trust", "identityProvider":"tenant.example.com",
    "availableForUserLogon":"false", "createShadowUsersDuringLogon":"true", "readOnly":true},
-  {"originKey":"sap.default", "name":"sap.default", "identityProvider":null,
-   "availableForUserLogon":"true", "createShadowUsersDuringLogon":"false"},
+  {"originKey":"sap.default", "name":"sap.default", "identityProvider":"sap.default.example.com",
+   "defaultIdp":true, "availableForUserLogon":"true", "createShadowUsersDuringLogon":"false"},
   {"originKey":"sa-native", "name":"Subaccount trust", "identityProvider":"tenant.example.com",
    "availableForUserLogon":"true", "createShadowUsersDuringLogon":"true"}
 ]
