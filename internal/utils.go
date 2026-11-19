@@ -98,7 +98,9 @@ func FlattenConnectionDetails(in map[string][]byte) (map[string][]byte, error) {
 			case string:
 				out[jk] = []byte(val)
 			default:
-				b, err := json.Marshal(val)
+				// Sort map keys: the json-iterator default follows random map order,
+				// which changes the connection secret on every reconcile.
+				b, err := json.ConfigCompatibleWithStandardLibrary.Marshal(val)
 				if err != nil {
 					return nil, err
 				}

@@ -1,11 +1,18 @@
 package subaccount
 
 import (
+	"context"
+
+	"github.com/SAP/xp-clifford/cli/export"
+	"github.com/SAP/xp-clifford/erratt"
 	"github.com/SAP/xp-clifford/yaml"
 	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/hierarchy"
 )
 
 const (
@@ -13,15 +20,19 @@ const (
 	warnMissingGuid        = "WARNING: 'guid' field is missing in the source, cannot set 'external-name'"
 	warnMissingRegion      = "WARNING: 'region' field is missing in the source, cannot set 'Region'"
 	warnMissingSubdomain   = "WARNING: 'subdomain' field is missing in the source, cannot set 'Subdomain'"
-	warnMissingCreatedBy   = "WARNING: 'createdBy' field is missing in the source, cannot set 'SubaccountAdmins'"
+	warnMissingAdmins      = "WARNING: no subaccount administrators found via role collection, cannot set 'SubaccountAdmins'"
 )
 
-func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
+func convertSubaccountResource(ctx context.Context, btpClient *btpcli.BtpCli, sa *subaccount, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 	saDisplayName := sa.GetDisplayName()
 	saGuid := sa.GetID()
 	saRegion := sa.Region
 	saSubdomain := sa.Subdomain
-	saCreatedBy := sa.CreatedBy
+	// Never nil: a subaccount without admins still emits an empty list.
+	saAdmins := sa.Admins
+	if saAdmins == nil {
+		saAdmins = []string{}
+	}
 	resourceName := sa.GenerateK8sResourceName()
 	externalName := sa.GetExternalName()
 
@@ -47,8 +58,8 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 				ForProvider: v1alpha1.SubaccountParameters{
 					DisplayName: saDisplayName,
 					Region:      saRegion,
-					// API doesn't provide the current list of admins. Using CreatedBy as the only admin for now.
-					SubaccountAdmins: []string{saCreatedBy},
+					// Administrators assigned to the "Subaccount Administrator" role collection.
+					SubaccountAdmins: saAdmins,
 					Subdomain:        saSubdomain,
 				},
 			},
@@ -70,8 +81,8 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 	if saSubdomain == "" {
 		saResource.AddComment(warnMissingSubdomain)
 	}
-	if saCreatedBy == "" {
-		saResource.AddComment(warnMissingCreatedBy)
+	if len(saAdmins) == 0 {
+		saResource.AddComment(warnMissingAdmins)
 	}
 
 	// Fill the optional fields that are relevant for the Update operation, to have it match status.atProvider
@@ -109,5 +120,39 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 	// BetaEnabled
 	saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.BetaEnabled = sa.BetaEnabled
 
+	// Reference the parent directory resource, if requested. Only subaccounts
+	// whose parent is a (selected) directory carry a DirectoryGuid; those
+	// parented by the global account have it empty and are left untouched.
+	if resolveReferences {
+		if err := resolveReference(ctx, btpClient, &saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider); err != nil {
+			eventHandler.Warn(erratt.Errorf("cannot resolve directory reference: %w", err).With("subaccount", sa.GetID()))
+			saResource.AddComment(resources.WarnCannotResolveDirectory + ": " + sa.ParentGUID)
+		}
+	}
+
 	return saResource
+}
+
+func resolveReference(ctx context.Context, btpClient *btpcli.BtpCli, spec *v1alpha1.SubaccountParameters) error {
+	// No parent directory to resolve (parent is the global account).
+	if spec.DirectoryGuid == "" {
+		return nil
+	}
+
+	h, err := hierarchy.Get(ctx, btpClient)
+	if err != nil {
+		return err
+	}
+
+	dName, err := h.DirectoryK8sResourceName(spec.DirectoryGuid)
+	if err != nil {
+		return err
+	}
+
+	spec.DirectoryRef = &v1.Reference{
+		Name: dName,
+	}
+	spec.DirectoryGuid = ""
+
+	return nil
 }

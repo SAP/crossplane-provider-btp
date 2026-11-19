@@ -17,6 +17,9 @@ const (
 	WarnMissingServiceName            = "WARNING: service name is missing"
 	WarnMissingServicePlanName        = "WARNING: service plan name is missing"
 	WarnMissingSubaccountGuid         = "WARNING: subaccount ID is missing"
+	WarnMissingDirectoryGuid          = "WARNING: directory ID is missing"
+	WarnMissingTrustOrigin            = "WARNING: trust origin is missing"
+	WarnMissingIdentityProvider       = "WARNING: identity provider is missing"
 	WarnMissingBindingId              = "WARNING: binding ID is missing"
 	WarnTooManyBindingIDs             = "WARNING: one binding ID expected, got: %d"
 	WarnMissingInstanceId             = "WARNING: service instance ID is missing"
@@ -27,6 +30,7 @@ const (
 	WarnUndefinedExternalName         = "WARNING: could not generate a valid external name"
 	WarnUnsupportedEntityType         = "WARNING: only 'SUBACCOUNT' entity type is supported for Entitlement resources"
 	WarnCannotResolveSubaccount       = "WARNING: cannot resolve subaccount ID to a resource name"
+	WarnCannotResolveDirectory        = "WARNING: cannot resolve directory ID to a resource name"
 	WarnServiceInstanceNotUsable      = "WARNING: service instance is not in a usable state"
 	WarnNotServiceManager             = "WARNING: the service instance is not a service manager instance"
 	WarnNotCloudManagement            = "WARNING: the service instance is not a cloud management instance"
@@ -38,6 +42,7 @@ const (
 	WarnDefaultEntitlementEnableFalse = "WARNING: entitlement does not have 'enable' field set to true"
 	WarnMissingKymaName               = "WARNING: Kyma name is missing"
 	WarnMissingKymaPlanName           = "WARNING: Kyma plan name is missing"
+	WarnParametersManual              = "WARNING: please add the forProvider.parameters field to this resource manually"
 )
 
 type BtpResource interface {

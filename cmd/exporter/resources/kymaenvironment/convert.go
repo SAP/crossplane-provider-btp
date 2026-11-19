@@ -95,6 +95,9 @@ func convertKymaEnvResource(ctx context.Context, btpClient *btpcli.BtpCli, e *Ky
 		kymaEnvInstance.AddComment(resources.WarnMissingCloudManagementName)
 	}
 
+	// Parameters cannot be reliably exported, so instruct the user to add them manually.
+	kymaEnvInstance.AddComment(resources.WarnParametersManual)
+
 	// Reference subaccount resource, if requested.
 	if resolveReferences {
 		if err := resolveReference(ctx, btpClient, &kymaEnvInstance.Object.(*v1alpha1.KymaEnvironment).Spec); err != nil {

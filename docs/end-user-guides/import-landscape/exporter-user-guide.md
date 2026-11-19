@@ -19,11 +19,17 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Export Command](#export-command)
 - [Supported Resource Kinds](#supported-resource-kinds)
   - [Subaccount](#subaccount)
+  - [Subaccount Trust Configuration](#subaccount-trust-configuration)
+  - [Subscription](#subscription)
+  - [Directory](#directory)
   - [Entitlement](#entitlement)
+  - [Directory Entitlement](#directory-entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
   - [Kyma Environment](#kyma-environment)
   - [Service Binding](#service-binding)
+  - [Role Collection](#role-collection)
+- [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy)
 - [Usage Examples](#usage-examples)
   - [Building the Exporter](#building-the-exporter)
   - [Interactive Mode](#interactive-mode)
@@ -35,6 +41,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
 - [Known Limitations](#known-limitations)
   - [`spec.forProvider.parameters` Is Always Null](#specforproviderparameters-is-always-null)
   - [`spec.forProvider.shared` Cannot Be Retrieved](#specforprovidershared-cannot-be-retrieved)
+  - [Role Collection xsuaa Credentials Are Not Exported](#role-collection-xsuaa-credentials-are-not-exported)
 - [Troubleshooting](#troubleshooting)
   - [Authentication Issues](#authentication-issues)
   - [Missing BTP CLI](#missing-btp-cli)
@@ -235,7 +242,14 @@ Exports BTP subaccount resources.
 
 **Selection criteria:**
 - BTP subaccount ID (exact match)
-- Regex expression matching subaccount display name
+- Regex expression matching a subaccount display name
+
+> [!NOTE]
+> The `--subaccount` flag selects from the list of **authorized subaccounts**.
+> The subaccount is the single entrypoint for an export; the directories above
+> the selected subaccount are derived automatically from the global account
+> hierarchy. See [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy)
+> for details.
 
 **Example:**
 ```bash
@@ -244,6 +258,155 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subacco
 
 # Export all subaccounts matching a pattern
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subaccount --subaccount '.*dev.*'
+```
+
+---
+
+### Directory Entitlement
+
+Exports service plan entitlements assigned to directories using `btp list accounts/entitlement --directory <GUID>`.
+
+**Kind name:** `directoryentitlement`
+
+**CLI flags:**
+| Flag | Description |
+|------|-------------|
+| `--subaccount <value>` | Source subaccount ID or name regex; its ancestor directories define the export scope |
+| `--directory <value>` | Optional filter for ancestor directories by ID or display-name regex |
+| `--directoryentitlement <value>` | Exact compound ID (`directoryID/serviceName/planName`) or regex matching `serviceName/planName` |
+
+Omit `--directoryentitlement` for interactive entitlement selection, or use `'.*'` to export every plan in the specified directories.
+
+**Notes:**
+- Only the directory's own `entitledServices` are exported; allocations to child subaccounts/directories in `assignedServices` are excluded.
+- Numeric plan categories (`SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, `ENVIRONMENT`) preserve `amount` and available `autoDistributeAmount`, including zero values. Non-numeric plans omit these fields because numeric quota is not applicable. `autoAssign` and the plan's unique identifier are preserved.
+- `distribute` is omitted because the CLI does not expose this write-time action. Add it explicitly if you want to distribute entitlements to existing subaccounts when enabling management.
+- Manifests use `spec.forProvider.directoryId` by default. With `--resolve-references`, they use `directoryRef.name` matching the exported Directory resource name instead. If resolution fails, the ID is retained and a warning is added.
+- `--all` includes this kind and exports entitlements for the source subaccount's ancestor directories without requiring `--directory`.
+
+**Example:**
+```bash
+go run ./cmd/exporter export \
+  --kind directoryentitlement \
+  --subaccount '<subaccount-guid>' \
+  --directory '^My Directory$' \
+  --directoryentitlement '.*' \
+  --resolve-references \
+  -o directory-entitlements.yaml
+ ```
+### Subaccount Trust Configuration
+
+Exports trust configurations from selected subaccounts using `btp list security/trust --subaccount <ID>`.
+
+**Kind name:** `subaccounttrustconfiguration`
+
+**CLI flag:** `--subaccounttrustconfiguration <value>`
+
+**Selection criteria:**
+- Compound ID: `subaccountID/origin` (exact match)
+- Regex matching the origin key, such as `^sap\.custom$`
+- Omit the flag for interactive selection. `--all` also includes this kind.
+
+**Notes:**
+- Manifests use `managementPolicies: [Observe]` and external names of `subaccountID/origin`.
+- The exporter maps the identity provider, domain, name, description, login link text, status, user-logon flag, and shadow-user flag from the list response. String booleans are parsed explicitly; missing flags remain unset and malformed values produce a commented warning manifest rather than silently becoming `false`.
+- Empty optional text fields are omitted. `sap.default` is included with `identityProvider: ""`, matching the provider's handling of the built-in trust.
+- Read-only/platform trusts are included for observation. Protocol, trust type, and read-only indicators are observation fields, not configurable CR parameters, and are not copied to `forProvider`.
+- Review trust settings carefully before enabling management. Read-only trusts cannot be edited, the built-in `sap.default` trust cannot be deleted, and changing login settings can affect access.
+- By default, manifests use `subaccountId`. With `--resolve-references`, they use `subaccountRef` with the name generated by the Subaccount exporter. The referenced Subaccount CR must exist; use `--kind subaccount,subaccounttrustconfiguration` to include it in the output.
+
+**Example:**
+```bash
+go run ./cmd/exporter export \
+  --kind subaccounttrustconfiguration \
+  --subaccount '<subaccount-guid>' \
+  --subaccounttrustconfiguration '.*' \
+  -o trusts.yaml
+```
+
+**Manual verification:** compare the manifest against the detailed response for the same origin:
+```bash
+btp --format json get security/trust '<origin>' --subaccount '<subaccount-guid>'
+```
+The CLI fields `linkTextForUserLogon`, `availableForUserLogon`, and `createShadowUsersDuringLogon` map to CR fields `linkText`, `availableForUserLogon`, and `autoCreateShadowUsers`, respectively.
+### Subscription
+
+Exports existing application subscriptions from selected BTP subaccounts.
+
+**Kind name:** `subscription`
+
+**CLI flag:** `--subscription <value>`
+
+**Selection criteria:**
+- BTP subscription GUID (exact match)
+- Regex expression matching the technical `appName` or `planName`
+
+**Notes:**
+- Applications in `NOT_SUBSCRIBED` state are excluded.
+- For selected applications reporting `supportsGetParameters: true`, the exporter retrieves parameters with `btp get accounts/subscription --show-parameters true` and includes them in `spec.forProvider.parameters`. This requires one additional CLI call per supported subscription.
+- If parameter retrieval is unsupported or fails, parameters remain `null`. Retrieval failures produce a warning and the subscription is still exported.
+
+
+**Example:**
+```bash
+# Export a specific subscription by subscription ID
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind subscription \
+  --subscription <subscription-id> \
+  --resolve-references
+# Export all subscriptions from one subaccount
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind subscription \
+  --subaccount <subaccount-id> \
+  --subscription '.*'
+```
+
+### Directory
+
+Exports the BTP directories **above** the selected subaccount(s), preserving the
+parent/child hierarchy.
+
+**Kind name:** `directory`
+
+**CLI flag:** `--directory <value>` (optional)
+
+**Selection criteria:**
+- The candidate set is always **derived** from the selected subaccount(s): for
+  each selected subaccount, the exporter walks the global account hierarchy
+  upward and collects every ancestor directory between the subaccount and the
+  global account.
+- `--directory` optionally **narrows** that derived set. A value matches a
+  derived directory by:
+  - BTP directory GUID (exact match), or
+  - a regex expression matching a directory display name.
+- When `--directory` is omitted, every derived ancestor directory is exported.
+  The flag never prompts: the subaccount is the single entrypoint, so directories
+  outside the selected subaccount's ancestry are never pulled in.
+
+**Notes:**
+- Given the hierarchy `dir1 → dir2`, `{dir3 → sa1}`, selecting `sa1` exports
+  `sa1` and its ancestor directory `dir3` (and `dir3`'s ancestors, if any). When
+  several subaccounts are selected, their ancestor directories are deduplicated.
+- Because `--directory` only filters the derived ancestors, a value that matches
+  no ancestor of the selected subaccount(s) yields no directories (not an error).
+- The directory hierarchy is preserved: when `--resolve-references` is set, a
+  directory whose parent is another **exported** directory references that
+  parent's resource name via `directoryRef`. Directories parented directly by
+  the global account carry no `directoryRef`.
+
+**Example:**
+```bash
+# Export a subaccount together with all its ancestor directories, references resolved
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind subaccount,directory \
+  --subaccount <subaccount-guid> \
+  --resolve-references
+
+# Narrow the exported directories to a single ancestor (by GUID or name regex)
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind directory \
+  --subaccount <subaccount-guid> \
+  --directory <directory-guid-or-name-regex>
 ```
 
 ---
@@ -375,6 +538,107 @@ Exports BTP service bindings from subaccounts.
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind servicebinding -o output.yaml
 ```
 
+---
+
+### Role Collection
+
+Exports BTP role collections from the selected subaccount(s).
+
+**Kind name:** `role-collection`
+
+**CLI flag:** `--role-collection <value>`
+
+**Selection criteria:**
+- Regex expression matching the role collection name
+
+> [!NOTE]
+> Role collections are enumerated from the subaccounts selected via
+> `--subaccount` (the single entrypoint for an export). A role collection has no
+> GUID of its own — its name is only unique within its parent subaccount — so
+> selection is by name regex rather than by ID. When `--role-collection` is
+> omitted, the exporter lets you choose interactively which role collections of
+> the selected subaccount(s) to export.
+
+**Notes:**
+- The exported `RoleCollection` carries its role references in
+  `spec.forProvider.roleReferences`, resolved from the source role collection.
+- xsuaa credentials for the parent subaccount are **not** exported. The resource
+  is emitted with an empty `subaccountApiCredentialRef` and a TODO warning
+  comment; you must supply credentials before applying it. See
+  [Role Collection xsuaa Credentials Are Not Exported](#role-collection-xsuaa-credentials-are-not-exported).
+
+**Example:**
+```bash
+# Export all role collections from a subaccount
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind role-collection \
+  --subaccount <subaccount-id>
+
+# Export role collections matching a pattern
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind role-collection \
+  --subaccount <subaccount-id> \
+  --role-collection '.*Administrator.*'
+```
+
+## Scope Selection and Directory Hierarchy
+
+The **subaccount is the single entrypoint** for an export. The `--subaccount`
+flag selects from the list of authorized subaccounts; the directories above the
+selected subaccount are then **derived** from the global account hierarchy. The
+`directory` kind has no entrypoint selector of its own — the optional
+`--directory` flag only narrows the derived ancestors (see
+[Directory](#directory)); it never selects directories outside the selected
+subaccount's ancestry.
+
+**Upward derivation.** For each selected subaccount, the exporter walks the
+global account hierarchy *upward*, collecting every ancestor directory between
+the subaccount and the global account. Given this hierarchy:
+
+```
+Global Account
+├─ Subaccount-A
+└─ Dir-1
+   ├─ Subaccount-B
+   └─ Dir-1_1
+      ├─ Subaccount-C
+      └─ Subaccount-D
+```
+
+selecting `Subaccount-C` derives the ancestor directories `Dir-1_1` and `Dir-1`.
+Selecting `Subaccount-A` derives no directories (it is parented directly by the
+global account). When several subaccounts are selected, their ancestor
+directories are deduplicated, so each directory is exported exactly once.
+
+**What each kind exports from the selection:**
+- `--kind subaccount` emits a `Subaccount` CR for every selected subaccount.
+- `--kind directory` emits a `Directory` CR for every derived ancestor directory,
+  optionally narrowed by `--directory` (see [Directory](#directory)).
+
+To capture the subaccount together with its directory chain as CRs, request both
+kinds together: `--kind subaccount,directory`.
+
+**Hierarchy preservation (with `--resolve-references`).** Parent relationships
+are resolved to Kubernetes resource-name references among the exported set:
+
+- A `Directory` whose parent is another exported directory gets a `directoryRef`
+  pointing at the parent `Directory` CR.
+- A `Subaccount` whose parent is a derived directory gets a `directoryRef`
+  pointing at that `Directory` CR.
+- Entities parented directly by the global account carry no `directoryRef`.
+
+> [!NOTE]
+> Because directories are derived from the selected subaccount, the full ancestor
+> chain is part of the exported set when `--kind directory` is included **and**
+> `--directory` is not used to narrow it, so parent references resolve. If you
+> narrow the set with `--directory` and drop a directory that is the parent of
+> another exported directory, that child's `directoryRef` cannot resolve and the
+> resource is emitted with a warning comment instead. If you export
+> `--kind subaccount` on its own (without `directory`), a subaccount's
+> `directoryRef` still resolves to the ancestor directory's resource name even
+> though no `Directory` CR is emitted; add `--kind directory` if you also want
+> those `Directory` CRs in the output.
+
 ## Usage Examples
 
 ### Building the Exporter
@@ -445,6 +709,14 @@ You can export multiple resource kinds in a single command by specifying a comma
 # Export subaccounts and Cloud Foundry environments together
 go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
   --kind subaccount,cloudfoundry-environment \
+  --resolve-references \
+  -o output.yaml
+
+# Export a directory subtree as CRs: the directory and its sub-directories plus
+# every descendant subaccount, with the hierarchy resolved via references
+go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
+  --kind subaccount,directory \
+  --subaccount <directory-guid> \
   --resolve-references \
   -o output.yaml
 ```
@@ -521,6 +793,20 @@ The `spec.forProvider.parameters` field is always exported as `null`. The BTP CL
 The `spec.forProvider.shared` field cannot be populated during export. The BTP CLI does not expose whether a service instance is shared.
 
 **Workaround:** Review the exported manifests and manually set the `shared` field to the correct value before applying the manifests to the cluster.
+
+---
+
+### Role Collection xsuaa Credentials Are Not Exported
+
+**Affected kinds:** `role-collection`
+
+A `RoleCollection` needs xsuaa credentials for its parent subaccount to be reconciled, supplied **either** inline via `spec.apiCredentials` **or** by reference via `spec.subaccountApiCredentialRef` (pointing at a `SubaccountApiCredential` resource). Exactly one of the two is required. The exporter emits neither: the source system does not expose the credentials, and the referenced `SubaccountApiCredential` resource is not itself exported. The resource is therefore emitted with an empty `subaccountApiCredentialRef` and a TODO warning comment.
+
+**Workaround:** Before applying the manifest (and before changing the management policy away from `Observe`), supply the credentials in one of two ways:
+- set `spec.apiCredentials` with a credential source and selectors for the subaccount, or
+- create a `SubaccountApiCredential` (with `readOnly: false`) for the subaccount and point `spec.subaccountApiCredentialRef.name` at it.
+
+Leaving both unset makes the resource fail to reconcile.
 
 ---
 

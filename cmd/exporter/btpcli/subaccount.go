@@ -14,8 +14,60 @@ func (c *BtpCli) ListSubaccounts(ctx context.Context) ([]Subaccount, error) {
 	return response.Value, nil
 }
 
+// GetSubaccountAdmins retrieves the usernames assigned to the "Subaccount Administrator"
+// role collection in the given subaccount.
+func (c *BtpCli) GetSubaccountAdmins(ctx context.Context, subaccountID string) ([]string, error) {
+	var response RoleCollectionAssignmentsResponse
+
+	err := c.ExecuteJSON(ctx, &response,
+		"get", "security/role-collection", "Subaccount Administrator",
+		"--subaccount", subaccountID,
+		"--show-user-assignments", "true",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return dedupRoleCollectionEmails(response.Items), nil
+}
+
+// dedupRoleCollectionEmails extracts the unique, non-empty e-mail addresses from role
+// collection user assignments, preserving order.
+//
+// Only page 1 (up to 500 users) is handled; more than 500 admins is not expected.
+func dedupRoleCollectionEmails(items []RoleCollectionUser) []string {
+	admins := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, u := range items {
+		// The accounts API expects e-mails for multi-environment subaccounts, so prefer
+		// the email. Fall back to username for entries without one (e.g. technical users)
+		// or for the default identity provider where username already is the e-mail.
+		admin := u.Email
+		if admin == "" {
+			continue
+		}
+		if _, ok := seen[admin]; ok {
+			continue
+		}
+		seen[admin] = struct{}{}
+		admins = append(admins, admin)
+	}
+
+	return admins
+}
+
 type SubaccountsResponse struct {
 	Value []Subaccount `json:"value,omitempty"`
+}
+
+// RoleCollectionAssignmentsResponse is the result of
+// `get security/role-collection <name> --show-user-assignments true`.
+type RoleCollectionAssignmentsResponse struct {
+	Items []RoleCollectionUser `json:"items,omitempty"`
+}
+
+type RoleCollectionUser struct {
+	Email string `json:"email,omitempty"`
 }
 
 type Subaccount struct {
