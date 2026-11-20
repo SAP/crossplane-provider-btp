@@ -520,6 +520,56 @@ func (mg *SubaccountDestinationCertificate) SetWriteConnectionSecretToReference(
 	mg.Spec.WriteConnectionSecretToReference = r
 }
 
+// GetCondition of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
+	return mg.Status.GetCondition(ct)
+}
+
+// GetDeletionPolicy of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) GetDeletionPolicy() xpv2.DeletionPolicy {
+	return mg.Spec.DeletionPolicy
+}
+
+// GetManagementPolicies of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) GetManagementPolicies() xpv2.ManagementPolicies {
+	return mg.Spec.ManagementPolicies
+}
+
+// GetProviderConfigReference of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) GetProviderConfigReference() *xpv2.Reference {
+	return mg.Spec.ProviderConfigReference
+}
+
+// GetWriteConnectionSecretToReference of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
+	return mg.Spec.WriteConnectionSecretToReference
+}
+
+// SetConditions of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) SetConditions(c ...xpv2.Condition) {
+	mg.Status.SetConditions(c...)
+}
+
+// SetDeletionPolicy of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) SetDeletionPolicy(r xpv2.DeletionPolicy) {
+	mg.Spec.DeletionPolicy = r
+}
+
+// SetManagementPolicies of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) SetManagementPolicies(r xpv2.ManagementPolicies) {
+	mg.Spec.ManagementPolicies = r
+}
+
+// SetProviderConfigReference of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) SetProviderConfigReference(r *xpv2.Reference) {
+	mg.Spec.ProviderConfigReference = r
+}
+
+// SetWriteConnectionSecretToReference of this SubaccountDestinationGeneratedCertificate.
+func (mg *SubaccountDestinationGeneratedCertificate) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
+	mg.Spec.WriteConnectionSecretToReference = r
+}
+
 // GetCondition of this SubaccountServiceBinding.
 func (mg *SubaccountServiceBinding) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)

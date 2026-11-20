@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -36,6 +37,8 @@ type connector struct {
 	kube            client.Client
 	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
+	// recorder emits Kubernetes events for binding-check warnings. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -62,11 +65,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
-	destClient, err := destination.NewDestinationClient(cred)
-	if err != nil {
+	sess := destination.NewSession(cred)
+	if err := destination.VerifyBinding(sess, cr, cr.Spec.ForProvider.SubaccountID, c.recorder); err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
-	return &external{kube: c.kube, client: destClient}, nil
+	return &external{kube: c.kube, client: sess.DestinationClient()}, nil
 }
 
 // external implements managed.ExternalClient.

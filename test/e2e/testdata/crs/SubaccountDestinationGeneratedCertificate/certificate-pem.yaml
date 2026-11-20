@@ -1,0 +1,16 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountDestinationGeneratedCertificate
+metadata:
+  name: e2e-gencert-pem-$BUILD_ID
+  namespace: default
+spec:
+  providerConfigRef:
+    name: default
+  forProvider:
+    name: e2e-gencert-$BUILD_ID.pem
+    subaccountRef:
+      name: e2e-dest-gencert-subaccount
+    destinationServiceBindingSecretRef:
+      name: e2e-dest-gencert-binding-secret
+      namespace: crossplane-system
+      key: credentials
