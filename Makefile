@@ -252,6 +252,19 @@ $(GOMPLATE):
 
 export GOMPLATE
 
+# Install envsubst
+ENVSUBST_VERSION := 1.4.2
+ENVSUBST := $(TOOLS_HOST_DIR)/envsubst-$(ENVSUBST_VERSION)
+
+$(ENVSUBST):
+	@$(INFO) installing envsubst $(SAFEHOSTPLATFORM)
+	@mkdir -p $(TOOLS_HOST_DIR)
+	@curl -fsSLo $(ENVSUBST) https://github.com/a8m/envsubst/releases/download/v$(ENVSUBST_VERSION)/envsubst-$(SAFEHOSTPLATFORM) || $(FAIL)
+	@chmod +x $(ENVSUBST)
+	@$(OK) installing envsubst $(SAFEHOSTPLATFORM)
+
+export ENVSUBST
+
 # This target adds a new api type and its controller.
 # You would still need to register new api in "apis/<provider>.go" and
 # controller in "internal/controller/<provider>.go".
@@ -328,7 +341,7 @@ test-acceptance-debug: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(OK) end-to-end tests passed
 
 .PHONY: generate-test-crs
-generate-test-crs:
+generate-test-crs: $(ENVSUBST)
 	@$(INFO) Rendering CRS templates from $(TEST_CRS_PATH) into $(TEST_CRS_GENERATED_PATH)
 	@if [ "$(abspath $(TEST_CRS_PATH))" = "$(abspath $(TEST_CRS_GENERATED_PATH))" ]; then \
 		echo "❌ TEST_CRS_PATH and TEST_CRS_GENERATED_PATH must differ; both point at $(TEST_CRS_PATH)"; \
@@ -340,7 +353,7 @@ generate-test-crs:
 	@# envsubst with an explicit allowlist — any other $VAR-shaped string in the
 	@# YAML (e.g. unrelated provider-config references) is preserved verbatim.
 	@for template in $$(find "$(TEST_CRS_GENERATED_PATH)" -type f -name "*.yaml"); do \
-		envsubst '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL $$SERVICE_BROKER_URL $$SERVICE_BROKER_USERNAME' < $$template > $$template.tmp && mv $$template.tmp $$template; \
+		$(ENVSUBST) '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL $$SERVICE_BROKER_URL $$SERVICE_BROKER_USERNAME' < $$template > $$template.tmp && mv $$template.tmp $$template; \
 	done
 	@$(OK) CRS rendered
 
