@@ -59,6 +59,9 @@ const (
 	// defaultClusterPrefix matches xp-testing's defaultPrefix used for the
 	// reused-cluster name.
 	defaultClusterPrefix = "e2e"
+	// kindNodeImageTagEnv optionally overrides the Kubernetes node image tag
+	// used by the E2E kind cluster. Unset preserves kind's default image.
+	kindNodeImageTagEnv = "KIND_NODE_IMAGE_TAG"
 )
 
 var (
@@ -139,11 +142,20 @@ func SetupClusterWithCrossplane(namespace string) {
 		}
 	}
 
+	createKindCluster := envfuncs.CreateCluster(&kind.Cluster{}, clusterName)
+	if tag := os.Getenv(kindNodeImageTagEnv); tag != "" {
+		createKindCluster = envfuncs.CreateClusterWithOpts(
+			&kind.Cluster{},
+			clusterName,
+			kind.WithImage("kindest/node:"+tag),
+		)
+	}
+
 	testenv.Setup(
 		xpenvfuncs.ValidateTestSetup(xpenvfuncs.ValidateTestSetupOptions{
 			CrossplaneVersion: crossplaneVersion,
 		}),
-		envfuncs.CreateCluster(&kind.Cluster{}, clusterName),
+		createKindCluster,
 		// Conditional matches Configure's behavior: when reusing an existing
 		// cluster we skip the install steps. We always install on a fresh
 		// cluster (firstSetup=true) and skip when reusing. We do not have a
