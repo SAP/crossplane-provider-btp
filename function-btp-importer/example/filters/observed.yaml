@@ -1,0 +1,33 @@
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: prod-instance
+  name: my-workload-xr-prod-instance
+spec:
+  forProvider:
+    name: prod-instance
+    subaccountId: 7b3f9a2e-4d1c-4f8a-b5e6-2c9d8f0a1b3e
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: dev-instance
+  name: my-workload-xr-dev-instance
+spec:
+  forProvider:
+    name: dev-instance
+    subaccountId: 7b3f9a2e-4d1c-4f8a-b5e6-2c9d8f0a1b3e
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: test-skip-instance
+  name: my-workload-xr-test-skip-instance
+spec:
+  forProvider:
+    name: test-skip-instance
+    subaccountId: 7b3f9a2e-4d1c-4f8a-b5e6-2c9d8f0a1b3e

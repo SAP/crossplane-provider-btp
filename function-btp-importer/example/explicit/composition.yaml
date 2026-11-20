@@ -1,0 +1,52 @@
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: explicit.example.crossplane.io
+spec:
+  compositeTypeRef:
+    apiVersion: example.crossplane.io/v1
+    kind: XBTPResources
+  mode: Pipeline
+  pipeline:
+    - step: create-resources
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        inline:
+          template: |
+            ---
+            apiVersion: account.btp.sap.crossplane.io/v1alpha1
+            kind: ServiceInstance
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: my-annotated-instance
+                import.btp.sap.crossplane.io/lookup: "true"
+            spec:
+              forProvider:
+                name: my-annotated-instance
+            ---
+            apiVersion: account.btp.sap.crossplane.io/v1alpha1
+            kind: ServiceInstance
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: my-plain-instance
+            spec:
+              forProvider:
+                name: my-plain-instance
+    - step: import-btp
+      functionRef:
+        name: function-btp-importer
+      input:
+        apiVersion: import.btp.sap.crossplane.io/v1beta1
+        kind: Input
+        mode: explicit
+        secretRef:
+          name:
+            value: "my-namespace-btp-provider-config"
+          namespace:
+            value: "my-namespace"
+          key: "cisCredentials"

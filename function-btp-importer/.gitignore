@@ -1,0 +1,37 @@
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS code
+.vscode/
+
+# idea related files
+**/.idea/*
+*.iml
+
+#Crossplane Build configurtions
+*.xpkg
+
+# Kuttl
+*.artifacts
+*kubeconfig*
+*kind-logs*
+
+# Generated files
+*kubeconfig*
+*.xpkg
+.crossplane/*
+.dep-hash
+
+
+# Local Dev files
+.env
+secrets/
+test-claims/
+
+CLAUDE.md
+.claude/*
+
+# Design docs — local planning only
+design-docs/
