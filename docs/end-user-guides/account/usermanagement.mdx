@@ -21,15 +21,24 @@ This guide shows how to use Crossplane to configure user access to your global a
 ## Enable XSUAA
 :::warning
 
-The `SubaccountApiCredentials` can not be imported from an existing BTP landscape. Its generated secret is only correct when Crossplane initially creates the resource from scratch.
+Fresh `SubaccountApiCredential` resources cannot adopt an existing BTP credential: BTP Read cannot recover its write-once generated secret. Use a distinct credential name, or manually remove the old credential and verify it is absent before recreating the MR with the same identity. Kubernetes-only recreation cannot recover the old secret.
 
-To fix the issue, use the BTP CLI to delete the previously generated credentials:
+Older MRs may be held with unresolved historical provenance. Do not approve ambiguous history. First independently verify that this exact MR created this exact credential, then read the MR's current UID and normalized compound external name. An authorized MR editor can approve with one UID- and identity-bound annotation:
 
 ```sh
-btp delete security/api-credential managed-subaccount-api-credential --subaccount [ID]
+kubectl annotate subaccountapicredentials.security.btp.sap.crossplane.io NAME \
+  'btp.sap.crossplane.io/legacy-management-approval=CURRENT-UID:SUBACCOUNT-ID/CREDENTIAL-NAME' \
+  --overwrite
 ```
 
-Once deleted, `SubaccountApiCredentials` will generate a new, correct secret.
+Verify normal reconciliation and health afterward; this approval cannot recover a missing Secret. MR annotation-edit permission is approval authority (it is not cluster-administrator-only). The binding prevents accidental copied/recreated/retargeted approval, not deliberate forgery by a permitted editor. Approval permits ordinary external deletion under applicable policies. To withdraw it, remove the annotation:
+
+```sh
+kubectl annotate subaccountapicredentials.security.btp.sap.crossplane.io NAME \
+  btp.sap.crossplane.io/legacy-management-approval-
+```
+
+A recorded failed-adoption rejection is not repaired by approval. A legacy MR deleted without approval is finalized locally while the BTP credential is preserved; manually clean up BTP when appropriate. Do not put Secret values or credentials in annotations or operational evidence.
 
 :::
 To orchestrate users and roles in BTP, you need to have access to the underlying XSUAA. The role collections can be managed on **subaccount, global-account, and directory** level.

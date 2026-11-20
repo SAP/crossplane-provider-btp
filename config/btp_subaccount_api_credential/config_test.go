@@ -2,6 +2,7 @@ package btp_subaccount_api_credential
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
@@ -10,7 +11,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
@@ -477,6 +480,61 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 			},
 			want: want{err: errors.New(errMissingClientSecret)},
 		},
+		"deleting failed-adoption resource with incomplete secret can reach cleanup": {
+			cr: func() *securityv1alpha1.SubaccountApiCredential {
+				cr := &securityv1alpha1.SubaccountApiCredential{
+					ObjectMeta: metav1.ObjectMeta{UID: "adoption-uid", DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()},
+					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+							WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
+						},
+					},
+				}
+				meta.SetExternalName(cr, "subaccount-guid/credential")
+				cr.SetConditions(xpv1.Condition{Type: "AdoptionRejected", Status: "True", Message: string(cr.UID) + ":" + meta.GetExternalName(cr)})
+				return cr
+			}(),
+			kube: func() *test.MockClient {
+				kube := test.NewMockClient()
+				kube.MockGet = test.NewMockGetFn(nil, func(obj client.Object) error {
+					if secret, ok := obj.(*corev1.Secret); ok {
+						secret.Data = map[string][]byte{
+							"attribute.client_id": []byte("some-id"),
+							"attribute.token_url": []byte("https://token-url"),
+							"attribute.api_url":   []byte("https://api-url"),
+						}
+					}
+					return nil
+				})
+				return kube
+			}(),
+		},
+		"secret read permission error is actionable": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()},
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+						WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
+					},
+				},
+			},
+			kube: func() *test.MockClient {
+				kube := test.NewMockClient()
+				kube.MockGet = test.NewMockGetFn(apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "my-secret", errors.New("access denied")))
+				return kube
+			}(),
+			want: want{},
+		},
+		"secret not found remains retryable by ordinary lifecycle": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+						WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
+					},
+				},
+			},
+			kube: &test.MockClient{MockGet: test.NewMockGetFn(apierrors.NewNotFound(schema.GroupResource{Resource: "secrets"}, "my-secret"))},
+		},
 		"secret incomplete - only client_id present - no error": {
 			cr: &securityv1alpha1.SubaccountApiCredential{
 				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
@@ -506,6 +564,12 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := &DeletionProtectionInitializer{Kube: tc.kube}
 			err := d.Initialize(context.Background(), tc.cr)
+			if name == "secret read permission error is actionable" {
+				if err == nil || !strings.Contains(err.Error(), "cannot read connection Secret for SubaccountApiCredential") || !strings.Contains(err.Error(), "forbidden") {
+					t.Fatalf("expected actionable permission error, got %v", err)
+				}
+				return
+			}
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("Initialize() error mismatch (-want +got):\n%s", diff)
 			}
