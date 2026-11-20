@@ -1,0 +1,46 @@
+# ──────────────────────────────────────────────────────────────────
+# security.btp.sap.crossplane.io — RoleCollections + Trust Configs
+# ──────────────────────────────────────────────────────────────────
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: btp-role-collections
+spec:
+  name: btp_role_collection_count
+  description: "Count of RoleCollection managed resources"
+  kind: RoleCollection
+  group: security.btp.sap.crossplane.io
+  version: v1alpha1
+  interval: "5m"
+  dimensions:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: condition_ready
+      fieldPath: "status.conditions[?(@.type=='Ready')]"
+      type: slice
+    - name: condition_synced
+      fieldPath: "status.conditions[?(@.type=='Synced')]"
+      type: slice
+---
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: btp-trust-configurations
+spec:
+  name: btp_trust_configuration_count
+  description: "Count of SubaccountTrustConfiguration managed resources per IdP origin"
+  kind: SubaccountTrustConfiguration
+  group: security.btp.sap.crossplane.io
+  version: v1alpha1
+  interval: "5m"
+  dimensions:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: origin
+      fieldPath: "spec.forProvider.origin"
+    - name: condition_ready
+      fieldPath: "status.conditions[?(@.type=='Ready')]"
+      type: slice
+    - name: condition_synced
+      fieldPath: "status.conditions[?(@.type=='Synced')]"
+      type: slice
