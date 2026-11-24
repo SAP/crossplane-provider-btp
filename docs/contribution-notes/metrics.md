@@ -33,6 +33,16 @@ successful and failed calls can be compared separately. The percentile queries
 estimate durations in seconds from histogram buckets and retain `le` (the bucket
 upper bound) for `histogram_quantile`.
 
+The provider does not expose zero-valued series for every label combination at
+startup. For example, the series for `kind="Subaccount"`, `operation="delete"`,
+and `outcome="success"` appears on `/metrics` only after the first `Subaccount`
+`Delete` call returns without an error.
+If Prometheus doesn't have a counter start timestamp, it can't count calls
+already included in the first scraped value. For example, a one-off `delete`
+can leave the raw `_count` at `1` on every scrape while `increase()` reports
+zero and the percentile queries have no bucket increases to work with. A
+missing or zero result does not prove that no calls occurred.
+
 ### p50 (median) duration
 
 ```promql
