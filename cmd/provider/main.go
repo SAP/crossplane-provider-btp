@@ -13,6 +13,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/config"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/features"
+	attemptmetrics "github.com/sap/crossplane-provider-btp/internal/metrics/entitlements"
 	"github.com/sap/crossplane-provider-btp/internal/metrics/externaloperation"
 	"github.com/sap/crossplane-provider-btp/internal/version"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -146,6 +147,7 @@ func main() {
 
 	externalOperations, err := externaloperation.NewRecorder(metrics.Registry)
 	kingpin.FatalIfError(err, "Cannot register external operation duration metrics")
+	kingpin.FatalIfError(attemptmetrics.Register(metrics.Registry), "Cannot register Entitlements API request attempt metrics")
 
 	setupTerraformControllers(mgr, log, externalOperations, maxReconcileRate, *pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, backoffBase, backoffMax, enableManagementPolicies)
 	setupNativeControllers(mgr, log, externalOperations, maxReconcileRate, pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)

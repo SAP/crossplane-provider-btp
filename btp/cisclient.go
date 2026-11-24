@@ -16,16 +16,17 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/sync/singleflight"
 
+	attemptmetrics "github.com/sap/crossplane-provider-btp/internal/metrics/entitlements"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	entitlementsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 )
 
 const (
-	errCouldNotParseCISSecret      = "CIS Secret seems malformed"
-	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
-	errCISBindingCredentialIsNil        = "CIS binding credential is nil"
-	errCISBindingMissingRequiredFields  = "CIS binding is missing required fields: %s"
+	errCouldNotParseCISSecret          = "CIS Secret seems malformed"
+	errCouldNotParseUserCredential     = "error while parsing sa-provider-secret JSON"
+	errCISBindingCredentialIsNil       = "CIS binding credential is nil"
+	errCISBindingMissingRequiredFields = "CIS binding is missing required fields: %s"
 )
 
 type InstanceParameters = map[string]interface{}
@@ -144,8 +145,8 @@ var buildClientFn = createClient
 // Credential rotation produces a new key automatically; old entries leak
 // until process restart. Add a TTL/LRU if rotation churn becomes an issue.
 var (
-	clientCache       sync.Map
-	clientBuildGroup  singleflight.Group
+	clientCache      sync.Map
+	clientBuildGroup singleflight.Group
 )
 
 // credentialCacheKey builds a stable string key from the credential bundle.
@@ -207,10 +208,8 @@ func hasClientCredentials(credential *Credentials) bool {
 }
 
 func createClient(credential *Credentials, config *clientcredentials.Config) Client {
-	// One shared oauth2 *http.Client across all 3 sub-clients so the token
-	// cache is shared. Without this, each createXxxServiceClient builds its
-	// own *http.Client → 3 independent token caches → extra token POSTs per
-	// Observe.
+	// Share a single OAuth token source across all three clients to avoid
+	// extra token POSTs, even when Entitlements uses its own transport.
 	sharedHTTPClient := sharedOAuthClient(config)
 	client := Client{
 		AccountsServiceClient:     createAccountsServiceClient(credential, sharedHTTPClient),
@@ -224,7 +223,6 @@ func createClient(credential *Credentials, config *clientcredentials.Config) Cli
 
 // sharedOAuthClient builds a single *http.Client backed by the debug-aware
 // HTTP transport and the oauth2 transport with a reused token source.
-// Sharing this client across the 3 sub-clients collapses 3 token caches into 1.
 func sharedOAuthClient(config *clientcredentials.Config) *http.Client {
 	baseHTTPClient := newBaseHTTPClientFn()
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, baseHTTPClient)
@@ -282,6 +280,16 @@ func createEntitlementsServiceClient(
 	c := entitlementsserviceclient.NewConfiguration()
 
 	c.HTTPClient = sharedHTTPClient
+	if transport, ok := sharedHTTPClient.Transport.(*oauth2.Transport); ok && transport != nil {
+		// Keep the shared token source and HTTP policies, but record only
+		// Entitlements dispatches that occur after token acquisition.
+		client := *sharedHTTPClient
+		client.Transport = &oauth2.Transport{
+			Source: transport.Source,
+			Base:   attemptmetrics.Wrap(transport.Base, entitlementsServiceUrl.EscapedPath()),
+		}
+		c.HTTPClient = &client
+	}
 	c.Servers = []entitlementsserviceclient.ServerConfiguration{{URL: entitlementsServiceUrl.String()}}
 
 	client := entitlementsserviceclient.NewAPIClient(c)
