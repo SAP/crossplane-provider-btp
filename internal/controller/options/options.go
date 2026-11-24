@@ -8,6 +8,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/internal/controller/pollinterval"
+	"github.com/sap/crossplane-provider-btp/internal/metrics/externaloperation"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -26,6 +27,7 @@ var _ RuntimeOptionsGenerator = CrossplaneOptions{}
 type CrossplaneOptions struct {
 	xpcontroller.Options
 
+	ExternalOperations   *externaloperation.Recorder
 	BackoffBase          time.Duration
 	BackoffMax           time.Duration
 	ReconcileTimeout     time.Duration
@@ -50,6 +52,7 @@ var _ RuntimeOptionsGenerator = UpjetOptions{}
 type UpjetOptions struct {
 	tjcontroller.Options
 
+	ExternalOperations   *externaloperation.Recorder
 	BackoffBase          time.Duration
 	BackoffMax           time.Duration
 	PollJitterPercentage uint

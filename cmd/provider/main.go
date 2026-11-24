@@ -13,12 +13,14 @@ import (
 	"github.com/sap/crossplane-provider-btp/config"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/features"
+	"github.com/sap/crossplane-provider-btp/internal/metrics/externaloperation"
 	"github.com/sap/crossplane-provider-btp/internal/version"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
@@ -142,13 +144,16 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, backoffBase, backoffMax, enableManagementPolicies)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
+	externalOperations, err := externaloperation.NewRecorder(metrics.Registry)
+	kingpin.FatalIfError(err, "Cannot register external operation duration metrics")
+
+	setupTerraformControllers(mgr, log, externalOperations, maxReconcileRate, *pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, backoffBase, backoffMax, enableManagementPolicies)
+	setupNativeControllers(mgr, log, externalOperations, maxReconcileRate, pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, externalOperations *externaloperation.Recorder, maxReconcileRate *int, pollInterval time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
@@ -162,6 +167,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 			OperationTrackerStore: tjcontroller.NewOperationStore(log),
 			SetupFn:               tfclient.TerraformSetupBuilder(),
 		},
+		ExternalOperations:   externalOperations,
 		BackoffBase:          *backoffBase,
 		BackoffMax:           *backoffMax,
 		PollJitterPercentage: pollJitterPercentage,
@@ -176,7 +182,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, externalOperations *externaloperation.Recorder, maxReconcileRate *int, pollInterval *time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
@@ -187,6 +193,7 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 		},
 		BackoffBase:          *backoffBase,
 		BackoffMax:           *backoffMax,
+		ExternalOperations:   externalOperations,
 		ReconcileTimeout:     *reconcileTimeout,
 		PollJitterPercentage: pollJitterPercentage,
 		PollMax:              pollMax,
