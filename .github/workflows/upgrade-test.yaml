@@ -29,7 +29,6 @@ jobs:
     environment: pr-e2e-no-approval
     permissions:
       contents: read
-      packages: write
     env:
       # hardcoded BTP CLI version
       btp_cli_version: 2.116.3
