@@ -90,9 +90,14 @@ func (co CrossplaneOptions) WithExternalConnector(kind string, c managed.Externa
 	return managed.WithExternalConnector(c)
 }
 
-// WithExternalConnector installs c with the adaptive-poll reset on Update.
-func (co UpjetOptions) WithExternalConnector(c managed.ExternalConnector) managed.ReconcilerOption {
-	return managed.WithExternalConnector(withAdaptivePollReset(co.pollConfig(), c))
+// WithExternalConnector installs c with the adaptive-poll reset on Update and
+// records calls at the managed boundary under the public Kubernetes kind.
+func (co UpjetOptions) WithExternalConnector(kind string, c managed.ExternalConnector) managed.ReconcilerOption {
+	c = withAdaptivePollReset(co.pollConfig(), c)
+	if co.ExternalOperations != nil {
+		c = co.ExternalOperations.Wrap(kind, c)
+	}
+	return managed.WithExternalConnector(c)
 }
 
 func (co CrossplaneOptions) pollConfig() pollinterval.Config {

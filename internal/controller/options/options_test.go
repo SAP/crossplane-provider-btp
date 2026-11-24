@@ -114,12 +114,15 @@ var optionStructs = map[string]func(pct uint, pollMax, pollMaxAfter time.Duratio
 			return o.WithExternalConnector("Directory", c)
 		}}
 	},
-	"UpjetOptions": func(pct uint, pollMax, pollMaxAfter time.Duration, _ *externaloperation.Recorder) optionsStruct {
+	"UpjetOptions": func(pct uint, pollMax, pollMaxAfter time.Duration, recorder *externaloperation.Recorder) optionsStruct {
 		o := UpjetOptions{
 			Options:              tjcontroller.Options{Options: xpcontroller.Options{PollInterval: time.Minute}},
+			ExternalOperations:   recorder,
 			PollJitterPercentage: pct, PollMax: pollMax, PollMaxAfter: pollMaxAfter,
 		}
-		return optionsStruct{o.PollReconcilerOptions, o.WithExternalConnector}
+		return optionsStruct{o.PollReconcilerOptions, func(c managed.ExternalConnector) managed.ReconcilerOption {
+			return o.WithExternalConnector("Directory", c)
+		}}
 	},
 }
 
@@ -205,13 +208,11 @@ func TestWithExternalConnectorPollReset(t *testing.T) {
 				if refreshed := got.LastTransitionTime.After(start); refreshed != tc.refreshed {
 					t.Errorf("Synced LTT = %v; refreshed = %v, want %v", got.LastTransitionTime, refreshed, tc.refreshed)
 				}
-				if sname == "CrossplaneOptions" {
-					controllertest.RequireExternalOperations(t, reg,
-						controllertest.ExternalOperation{Kind: "Directory", Operation: "connect", Outcome: "success"},
-						controllertest.ExternalOperation{Kind: "Directory", Operation: "observe", Outcome: "success"},
-						controllertest.ExternalOperation{Kind: "Directory", Operation: "update", Outcome: "success"},
-					)
-				}
+				controllertest.RequireExternalOperations(t, reg,
+					controllertest.ExternalOperation{Kind: "Directory", Operation: "connect", Outcome: "success"},
+					controllertest.ExternalOperation{Kind: "Directory", Operation: "observe", Outcome: "success"},
+					controllertest.ExternalOperation{Kind: "Directory", Operation: "update", Outcome: "success"},
+				)
 			})
 		}
 	}
