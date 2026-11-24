@@ -12,7 +12,6 @@ name: Custom Upgrade Test Workflow
 
 permissions:
   contents: read
-  packages: write
 
 on:
   workflow_dispatch:
@@ -51,7 +50,7 @@ jobs:
   custom-upgrade-test:
     runs-on: ubuntu-latest
     needs: prepare-matrix
-    environment: pr-e2e-approval
+    environment: pr-e2e-no-approval
     strategy:
       fail-fast: false
       matrix:
