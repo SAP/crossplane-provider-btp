@@ -34,10 +34,16 @@ jobs:
 
       - name: Set matrix with test names
         id: set-matrix
+        env:
+          TEST_FILTER: ${{ github.event.inputs.testFilter }}
         run: |
-          if [ -n "${{ github.event.inputs.testFilter }}" ]; then
+          if [ -n "$TEST_FILTER" ]; then
+            if ! echo "$TEST_FILTER" | grep -qE '^[a-zA-Z0-9_|^$.()*+?\[\]-]+$'; then
+              echo "Error: testFilter contains invalid characters: '$TEST_FILTER'" >&2
+              exit 1
+            fi
             # Use the provided filter as a single test entry
-            echo "test-names=$(echo '${{ github.event.inputs.testFilter }}' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
+            echo "test-names=$(echo "$TEST_FILTER" | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
           else
             # Discover all upgrade tests, excluding the baseline upgrade test
             echo "test-names=$(grep -rh --include='*_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/upgrade | sed 's/func //;s/(t \*testing.T)//' | grep -v 'Test_BaselineUpgradeProvider' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
@@ -91,9 +97,8 @@ jobs:
 
       - name: Run custom upgrade test
         timeout-minutes: 120
-        run: |
-          make upgrade-test testFilter=${{ matrix.testName }}
         env:
+          TEST_NAME: ${{ matrix.testName }}
           BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
@@ -104,6 +109,8 @@ jobs:
           IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
           UPGRADE_TEST_FROM_TAG: "v1.0.3"
           UPGRADE_TEST_TO_TAG: "local"
+        run: |
+          make upgrade-test testFilter="$TEST_NAME"
 
   cleanup-custom-upgrade-test:
     runs-on: ubuntu-latest
