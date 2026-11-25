@@ -1,4 +1,4 @@
-// Package entitlements records HTTP request attempts to the BTP Entitlements API.
+// Package entitlements records HTTP request attempts and response latency for the BTP Entitlements API.
 package entitlements
 
 import (
@@ -40,23 +40,17 @@ func wrap(base http.RoundTripper, prefix string, counter *prometheus.CounterVec)
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	return &attemptTransport{
-		base:         base,
-		counter:      counter,
-		assignments:  prefix + assignmentsPath,
-		servicePlans: prefix + servicePlansPath,
-	}
+	return &attemptTransport{base: base, counter: counter, routes: newOperationRoutes(prefix)}
 }
 
 type attemptTransport struct {
-	base         http.RoundTripper
-	counter      *prometheus.CounterVec
-	assignments  string
-	servicePlans string
+	base    http.RoundTripper
+	counter *prometheus.CounterVec
+	routes  operationRoutes
 }
 
 func (t *attemptTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	operation := t.operation(req)
+	operation := t.routes.operation(req)
 	resp, err := t.base.RoundTrip(req)
 	if operation != "" {
 		t.counter.WithLabelValues("entitlements", operation, result(resp, err)).Inc()
@@ -64,12 +58,21 @@ func (t *attemptTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	return resp, err
 }
 
-func (t *attemptTransport) operation(req *http.Request) string {
+type operationRoutes struct {
+	assignments  string
+	servicePlans string
+}
+
+func newOperationRoutes(prefix string) operationRoutes {
+	return operationRoutes{assignments: prefix + assignmentsPath, servicePlans: prefix + servicePlansPath}
+}
+
+func (r operationRoutes) operation(req *http.Request) string {
 	path := req.URL.EscapedPath()
 	switch {
-	case req.Method == http.MethodGet && path == t.assignments:
+	case req.Method == http.MethodGet && path == r.assignments:
 		return directoryOperation
-	case req.Method == http.MethodPut && path == t.servicePlans:
+	case req.Method == http.MethodPut && path == r.servicePlans:
 		return servicePlanOperation
 	default:
 		return ""

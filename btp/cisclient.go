@@ -16,7 +16,7 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/sync/singleflight"
 
-	attemptmetrics "github.com/sap/crossplane-provider-btp/internal/metrics/entitlements"
+	entitlementmetrics "github.com/sap/crossplane-provider-btp/internal/metrics/entitlements"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	entitlementsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
@@ -284,9 +284,22 @@ func createEntitlementsServiceClient(
 		// Keep the shared token source and HTTP policies, but record only
 		// Entitlements dispatches that occur after token acquisition.
 		client := *sharedHTTPClient
+		prefix := entitlementsServiceUrl.EscapedPath()
+		base := transport.Base
+		if debugger, ok := base.(*RoundTripDebugger); ok {
+			if debugger != nil {
+				// Measure before the debugger drains the body, without modifying
+				// the debugger shared by the token source and the other clients.
+				copiedDebugger := *debugger
+				copiedDebugger.base = entitlementmetrics.WrapDuration(debugger.base, prefix)
+				base = &copiedDebugger
+			}
+		} else {
+			base = entitlementmetrics.WrapDuration(base, prefix)
+		}
 		client.Transport = &oauth2.Transport{
 			Source: transport.Source,
-			Base:   attemptmetrics.Wrap(transport.Base, entitlementsServiceUrl.EscapedPath()),
+			Base:   entitlementmetrics.Wrap(base, prefix),
 		}
 		c.HTTPClient = &client
 	}
