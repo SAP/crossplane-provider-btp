@@ -34,18 +34,23 @@ jobs:
       # hardcoded BTP CLI version
       btp_cli_version: 2.116.3
     steps:
-      - name: Set TARGET_IMAGE_VERSION
+      - name: Validate upgrade versions
         env:
+          SOURCE_INPUT: ${{ github.event.inputs.source }}
           TARGET_INPUT: ${{ github.event.inputs.target }}
         run: |
-          if [ -z "$TARGET_INPUT" ]; then
-            echo "TARGET_IMAGE_VERSION=local" >> $GITHUB_ENV
-          elif echo "$TARGET_INPUT" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?$|^local$'; then
-            echo "TARGET_IMAGE_VERSION=$TARGET_INPUT" >> $GITHUB_ENV
-          else
-            echo "Error: target input '$TARGET_INPUT' is not a valid semver (e.g. v1.2.3) or 'local'" >&2
+          export LC_ALL=C
+          version_pattern='^(v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?|local)$'
+          TARGET_INPUT=${TARGET_INPUT:-local}
+          if [[ ! "$SOURCE_INPUT" =~ $version_pattern ]]; then
+            echo "Error: source must be a version such as v1.2.3 or 'local'" >&2
             exit 1
           fi
+          if [[ ! "$TARGET_INPUT" =~ $version_pattern ]]; then
+            echo "Error: target must be a version such as v1.2.3 or 'local'" >&2
+            exit 1
+          fi
+          printf 'SOURCE_IMAGE_VERSION=%s\nTARGET_IMAGE_VERSION=%s\n' "$SOURCE_INPUT" "$TARGET_INPUT" >> "$GITHUB_ENV"
 
       - name: Print TARGET_IMAGE_VERSION
         run: |
@@ -96,7 +101,7 @@ jobs:
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
           IDP_URL: ${{ secrets.IDP_URL }} # Primary IDP: SECOND_IDP_URL is not a registered IAS host, so subaccount trust config creation 404s against it
-          UPGRADE_TEST_FROM_TAG: ${{ github.event.inputs.source }}
+          UPGRADE_TEST_FROM_TAG: ${{ env.SOURCE_IMAGE_VERSION }}
           UPGRADE_TEST_TO_TAG: ${{ env.TARGET_IMAGE_VERSION }}
 
       - name: clean up cluster

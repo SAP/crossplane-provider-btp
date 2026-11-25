@@ -37,21 +37,26 @@ jobs:
         env:
           TEST_FILTER: ${{ github.event.inputs.testFilter }}
         run: |
+          export LC_ALL=C
+          # Put literal ] first and - last in the bracket expression.
+          filter_pattern='^[]a-zA-Z0-9_|^$.()*+?\[-]+$'
           if [ -n "$TEST_FILTER" ]; then
-            if ! echo "$TEST_FILTER" | grep -qE '^[a-zA-Z0-9_|^$.()*+?\[\]-]+$'; then
-              echo "Error: testFilter contains invalid characters: '$TEST_FILTER'" >&2
+            if [[ ! "$TEST_FILTER" =~ $filter_pattern ]]; then
+              echo "Error: testFilter must be a single-line Go test regex using only the supported characters" >&2
               exit 1
             fi
             # Use the provided filter as a single test entry
-            echo "test-names=$(echo "$TEST_FILTER" | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
+            printf 'test-names=%s\n' "$(jq -cn --arg filter "$TEST_FILTER" '[$filter]')" >> "$GITHUB_OUTPUT"
           else
             # Discover all upgrade tests, excluding the baseline upgrade test
-            echo "test-names=$(grep -rh --include='*_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/upgrade | sed 's/func //;s/(t \*testing.T)//' | grep -v 'Test_BaselineUpgradeProvider' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
+            printf 'test-names=%s\n' "$(grep -rh --include='*_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/upgrade | sed 's/func //;s/(t \*testing.T)//' | grep -v 'Test_BaselineUpgradeProvider' | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Print test names
+        env:
+          TEST_NAMES: ${{ steps.set-matrix.outputs.test-names }}
         run: |
-          echo "Test names: ${{ steps.set-matrix.outputs.test-names }}"
+          printf 'Test names: %s\n' "$TEST_NAMES"
 
   custom-upgrade-test:
     runs-on: ubuntu-latest
@@ -97,6 +102,9 @@ jobs:
 
       - name: Run custom upgrade test
         timeout-minutes: 120
+        run: |
+          # Make expands dollar signs too. Preserve them and do not export the raw filter to Make.
+          env -u TEST_NAME make upgrade-test "testFilter=${TEST_NAME//\$/\$\$}"
         env:
           TEST_NAME: ${{ matrix.testName }}
           BUILD_ID: ${{ env.BUILD_ID }}
@@ -109,8 +117,6 @@ jobs:
           IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
           UPGRADE_TEST_FROM_TAG: "v1.0.3"
           UPGRADE_TEST_TO_TAG: "local"
-        run: |
-          make upgrade-test testFilter="$TEST_NAME"
 
   cleanup-custom-upgrade-test:
     runs-on: ubuntu-latest
