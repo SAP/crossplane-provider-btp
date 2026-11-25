@@ -35,7 +35,8 @@ jobs:
   detect-only-doc-changes:
     uses: SAP/crossplane-shared-workflows/.github/workflows/detect-only-doc-changes.lib.yaml@29ddbec3a9647a0101129e9f82343da13300fac4 # main
 
-  # Approval job detects user's author association and bypasses the manual approval step for certain users.
+  # Approval job detects if user's login is part of the automatic E2E approval list (vars.E2E_AUTOMATIC_APPROVAL_USER_LOGINS, json array of github logins)
+  # Set/edit the list under repo Settings > Secrets and variables > Actions > Variables (unset -> '[]' -> approval required).
   approve:
     needs: [detect-only-doc-changes]
     # !cancelled() so that this job is not skipped if detect-only fails for any reason,
@@ -43,7 +44,7 @@ jobs:
     if: ${{ !cancelled() && needs.detect-only-doc-changes.outputs.has-only-doc-changes != 'true' }}
     runs-on: ubuntu-latest
     environment:
-      name: ${{ (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR') && 'pr-e2e-no-approval' || 'pr-e2e-approval' }}
+      name: ${{ contains(fromJSON(vars.E2E_AUTOMATIC_APPROVAL_USER_LOGINS || '[]'), github.event.pull_request.user.login) && 'pr-e2e-no-approval' || 'pr-e2e-approval' }}
       deployment: false
     steps:
       - run: echo "Approved"
