@@ -28,10 +28,9 @@ const (
 	shortWait = 30 * time.Second
 	timeout   = 2 * time.Minute
 
-	errListPCUs     = "cannot list ResourceUsages"
-	errDeletePU     = "cannot delete ResourceUsage"
-	errUpdate       = "cannot update ResourceUsage"
-	errUpdateStatus = "cannot update ResourceUsage status"
+	errListPCUs = "cannot list ResourceUsages"
+	errDeletePU = "cannot delete ResourceUsage"
+	errUpdate   = "cannot update ResourceUsage"
 )
 
 // Event reasons.
@@ -190,10 +189,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			log.Debug(msg)
 			r.record.Event(ru, event.Warning(reasonAccount, errors.New(msg)))
 
-			// We're watching our usages, so we'll be requeued when they go.
-			// A NotFound here means the ResourceUsage was removed while this
-			// reconcile was in flight; there is no status left to write.
-			return reconcile.Result{}, errors.Wrap(resource.IgnoreNotFound(r.client.Status().Update(ctx, ru)), errUpdateStatus)
+			// Nothing watches the target, so no event requeues this ResourceUsage
+			// when the target goes away: poll until it does. A usage that is deleted
+			// while its target still exists - foreground deletion of the target does
+			// exactly that - would otherwise keep its finalizer forever and block the
+			// deletion of the source.
+			//
+			// There is deliberately no status update here. ResourceUsage has no
+			// status subresource, so that write always returned NotFound. Until
+			// NotFound was made terminal, the resulting error retry was what brought
+			// this reconcile back; afterwards nothing did.
+			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}
 		// Deletion and removal of finalizer must happen before
 		return reconcile.Result{}, errors.New("inconsistent state, do requeue")
