@@ -1,6 +1,7 @@
 package subaccountdestinationcertificate
 
 import (
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -12,17 +13,15 @@ import (
 )
 
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
+	name := managed.ControllerName(apisv1alpha1.SubaccountDestinationCertificate_GroupKind)
+	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 	return providerconfig.DefaultSetupWithoutDefaultInitializer(
 		mgr, o,
 		&apisv1alpha1.SubaccountDestinationCertificate{},
 		apisv1alpha1.SubaccountDestinationCertificate_GroupKind,
 		apisv1alpha1.SubaccountDestinationCertificate_GroupVersionKind,
 		func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
-			return &connector{
-				kube:            kube,
-				usage:           usage,
-				resourcetracker: resourcetracker,
-			}
+			return &connector{kube: kube, usage: usage, resourcetracker: resourcetracker, recorder: recorder}
 		},
 	)
 }

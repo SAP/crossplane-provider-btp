@@ -1,0 +1,505 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: subaccountdestinationgeneratedcertificates.account.btp.sap.crossplane.io
+spec:
+  group: account.btp.sap.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - account
+    kind: SubaccountDestinationGeneratedCertificate
+    listKind: SubaccountDestinationGeneratedCertificateList
+    plural: subaccountdestinationgeneratedcertificates
+    singular: subaccountdestinationgeneratedcertificate
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.atProvider.certificate.commonName
+      name: CN
+      type: string
+    - jsonPath: .status.atProvider.certificate.notAfter
+      name: NOT-AFTER
+      type: string
+    - jsonPath: .metadata.annotations.crossplane\.io/external-name
+      name: EXTERNAL-NAME
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          SubaccountDestinationGeneratedCertificate manages a certificate that the
+          Destination service generates with SAP Cloud PKI in a SAP BTP subaccount.
+          The key pair stays in BTP; status reports only public data of the leaf
+          certificate.
+
+          The certificate is never regenerated. To rotate, create a resource with a
+          new name, repoint the destinations, then delete the old one. SAP Cloud PKI
+          doesn't revoke certificates: a deleted or renewed certificate stays valid
+          until it expires. .p12 keystores aren't supported in FIPS environments.
+
+          Use it from a ClientCertificateAuthentication SubaccountDestination: set
+          KeyStoreLocation to the certificate name in additionalProperties and
+          KeyStorePassword via additionalConfigurationSecretRefs.
+
+          The Destination REST API can't tell a generated certificate from an uploaded
+          one and doesn't return auto-renew or validity, so a re-upload outside
+          Crossplane drops auto-renew unnoticed. For the same reason, don't adopt a
+          generated certificate into SubaccountDestinationCertificate.
+
+          The binding in destinationServiceBindingSecretRef must belong to the
+          subaccount in subaccountId; otherwise the resource goes Synced=False and a
+          delete blocks. If the binding can't be fixed and the resource must go, set
+          deletionPolicy: Orphan.
+
+          External-Name Configuration:
+            - Follows Standard: no (compound key, not a single GUID)
+            - Format: `<subaccount-id>/<certificate-name>`
+            - How to find:
+            - UI: SAP BTP Cockpit → Subaccount → Connectivity → Certificates (field: Name)
+            - API: certificate name = path parameter of GET /v1/subaccountCertificates/\{certificate name\}/publicKeys; subaccount ID = the Subaccount's GUID (cockpit or Subaccount status.atProvider)
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SubaccountDestinationGeneratedCertificateSpec defines the
+              desired state.
+            properties:
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what will happen to the underlying external
+                  when this managed resource is deleted - either "Delete" or "Orphan" the
+                  external resource.
+                  This field is planned to be deprecated in favor of the ManagementPolicies
+                  field in a future release. Currently, both could be set independently and
+                  non-default values would be honored if the feature flag is enabled.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                enum:
+                - Orphan
+                - Delete
+                type: string
+              forProvider:
+                description: |-
+                  SubaccountDestinationGeneratedCertificateParameters are the configurable fields.
+                  Certificate fields are immutable: changing a generated certificate would turn
+                  it into an uploaded one. The binding and subaccount references stay mutable.
+                properties:
+                  automaticRenew:
+                    default: false
+                    description: |-
+                      AutomaticRenew lets the Destination service renew the certificate before
+                      it expires, keeping name, password and type.
+                    type: boolean
+                    x-kubernetes-validations:
+                    - message: automaticRenew can't be updated once set
+                      rule: self == oldSelf
+                  commonName:
+                    description: CommonName (CN) of the certificate. Server default
+                      applies when unset.
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+                  destinationServiceBindingSecretRef:
+                    description: |-
+                      DestinationServiceBindingSecretRef points to a Kubernetes Secret containing
+                      Destination Service OAuth2 credentials of a binding in the same subaccount
+                      as subaccountId. The secret can be created by a ServiceBinding CR
+                      (recommended) or manually.
+
+                      Two secret formats are accepted:
+                        - Flat keys (set key to ""): clientid, clientsecret, tokenurl/token_url, uri/url
+                        - Single JSON key (set key): the named key holds a JSON object with those fields
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  name:
+                    description: |-
+                      Name of the certificate in the subaccount certificate store, ending in
+                      .pem (private key and certificate chain) or .p12 (PKCS#12 keystore).
+                      Destinations reference it via the KeyStoreLocation property.
+                    pattern: ^.+\.(pem|p12)$
+                    type: string
+                    x-kubernetes-validations:
+                    - message: name can't be updated once set
+                      rule: self == oldSelf
+                  passwordSecretRef:
+                    description: |-
+                      PasswordSecretRef points to the Secret key holding the password for the
+                      private key (.pem) or keystore (.p12). The value must not be empty. Read
+                      only when the certificate is generated. If unset, the key isn't
+                      password-protected, as when generated in the cockpit.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  subaccountId:
+                    description: SubaccountID is the GUID of the subaccount that owns
+                      this certificate.
+                    type: string
+                  subaccountRef:
+                    description: Reference to a Subaccount to populate subaccountId.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  subaccountSelector:
+                    description: Selector for a Subaccount to populate subaccountId.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  validity:
+                    description: Validity of the certificate. Server default applies
+                      when unset.
+                    properties:
+                      timeUnit:
+                        description: TimeUnit of Value.
+                        enum:
+                        - DAYS
+                        - MONTHS
+                        - YEARS
+                        type: string
+                      value:
+                        description: Value in TimeUnit. The Destination service enforces
+                          the SAP Cloud PKI maximum.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    required:
+                    - timeUnit
+                    - value
+                    type: object
+                required:
+                - destinationServiceBindingSecretRef
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: commonName can't be added, changed or removed once set
+                  rule: has(self.commonName) == has(oldSelf.commonName) && (!has(self.commonName)
+                    || self.commonName == oldSelf.commonName)
+                - message: validity can't be added, changed or removed once set
+                  rule: has(self.validity) == has(oldSelf.validity) && (!has(self.validity)
+                    || self.validity == oldSelf.validity)
+                - message: passwordSecretRef can't be added, changed or removed once
+                    set
+                  rule: has(self.passwordSecretRef) == has(oldSelf.passwordSecretRef)
+                    && (!has(self.passwordSecretRef) || self.passwordSecretRef ==
+                    oldSelf.passwordSecretRef)
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  This field is planned to replace the DeletionPolicy field in a future
+                  release. Currently, both could be set independently and non-default
+                  values would be honored if the feature flag is enabled. If both are
+                  custom, the DeletionPolicy field will be ignored.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                  policy:
+                    description: Policies for referencing.
+                    properties:
+                      resolution:
+                        default: Required
+                        description: |-
+                          Resolution specifies whether resolution of this reference is required.
+                          The default is 'Required', which means the reconcile will fail if the
+                          reference cannot be resolved. 'Optional' means this reference will be
+                          a no-op if it cannot be resolved.
+                        enum:
+                        - Required
+                        - Optional
+                        type: string
+                      resolve:
+                        description: |-
+                          Resolve specifies when this reference should be resolved. The default
+                          is 'IfNotPresent', which will attempt to resolve the reference only when
+                          the corresponding field is not present. Use 'Always' to resolve the
+                          reference on every reconcile.
+                        enum:
+                        - Always
+                        - IfNotPresent
+                        type: string
+                    type: object
+                required:
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                  namespace:
+                    description: Namespace of the secret.
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: SubaccountDestinationGeneratedCertificateStatus defines the
+              observed state.
+            properties:
+              atProvider:
+                description: SubaccountDestinationGeneratedCertificateObservation
+                  holds fields observed from the API.
+                properties:
+                  certificate:
+                    description: Certificate is the public data of the current leaf
+                      certificate.
+                    properties:
+                      commonName:
+                        description: CommonName of the subject.
+                        type: string
+                      issuer:
+                        description: Issuer DN, RFC 2253.
+                        type: string
+                      notAfter:
+                        description: NotAfter of the leaf certificate. Moves forward
+                          on renewal.
+                        format: date-time
+                        type: string
+                      notBefore:
+                        description: NotBefore of the leaf certificate.
+                        format: date-time
+                        type: string
+                      serialNumber:
+                        description: SerialNumber as uppercase hex. Changes on renewal.
+                        type: string
+                      sha256Fingerprint:
+                        description: SHA256Fingerprint of the DER-encoded leaf certificate,
+                          lowercase hex.
+                        type: string
+                      subject:
+                        description: Subject DN, RFC 2253.
+                        type: string
+                    required:
+                    - commonName
+                    - issuer
+                    - notAfter
+                    - notBefore
+                    - serialNumber
+                    - sha256Fingerprint
+                    - subject
+                    type: object
+                  name:
+                    description: Name of the certificate.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              lastHandledReconcileAt:
+                description: |-
+                  LastHandledReconcileAt holds the value of the most recent
+                  reconcile-requested-at annotation token that the controller has
+                  processed. Users can compare this to the annotation to determine
+                  whether a reconcile request has been handled.
+                type: string
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
