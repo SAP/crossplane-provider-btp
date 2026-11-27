@@ -9,13 +9,15 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 
-	attemptmetrics "github.com/sap/crossplane-provider-btp/internal/metrics/entitlements"
+	entitlementmetrics "github.com/sap/crossplane-provider-btp/internal/metrics/entitlements"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 )
 
@@ -33,6 +35,36 @@ func attemptResponse(req *http.Request, code int, body string) *http.Response {
 	}
 }
 
+type durationSample struct {
+	count uint64
+	sum   float64
+}
+
+func entitlementsDurationSnapshot(t *testing.T, reg *prometheus.Registry) map[string]durationSample {
+	t.Helper()
+	families, err := reg.Gather()
+	require.NoError(t, err)
+	values := make(map[string]durationSample)
+	for _, family := range families {
+		if family.GetName() != "provider_btp_api_request_duration_seconds" {
+			continue
+		}
+		for _, sample := range family.GetMetric() {
+			labels := make(map[string]string)
+			for _, label := range sample.GetLabel() {
+				labels[label.GetName()] = label.GetValue()
+			}
+			require.Len(t, labels, 2)
+			require.Equal(t, "entitlements", labels["service"])
+			require.Contains(t, []string{"get_directory_assignments", "set_service_plans"}, labels["operation"])
+			histogram := sample.GetHistogram()
+			require.NotNil(t, histogram)
+			values[labels["operation"]] = durationSample{count: histogram.GetSampleCount(), sum: histogram.GetSampleSum()}
+		}
+	}
+	return values
+}
+
 func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 	// Changes the base transport hook; do not run in parallel.
 	const (
@@ -46,7 +78,16 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 		accountJSON   = `{"commercialModel":"","consumptionBased":false,"createdDate":0,"description":"","displayName":"test","geoAccess":"","globalAccountGUID":"test","guid":"test","licenseType":"","parentGUID":"","parentType":""}`
 	)
 	reg := prometheus.NewRegistry()
-	require.NoError(t, attemptmetrics.Register(reg))
+	require.NoError(t, entitlementmetrics.Register(reg))
+	require.NoError(t, entitlementmetrics.RegisterDuration(reg))
+	durationCounts := func(t *testing.T) map[string]uint64 {
+		t.Helper()
+		counts := make(map[string]uint64)
+		for operation, sample := range entitlementsDurationSnapshot(t, reg) {
+			counts[operation] = sample.count
+		}
+		return counts
+	}
 	type sampleKey struct{ operation, result string }
 	gather := func() map[sampleKey]float64 {
 		t.Helper()
@@ -54,7 +95,9 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 		require.NoError(t, err)
 		values := make(map[sampleKey]float64)
 		for _, family := range families {
-			require.Equal(t, "provider_btp_api_request_attempts_total", family.GetName())
+			if family.GetName() != "provider_btp_api_request_attempts_total" {
+				continue
+			}
 			for _, sample := range family.GetMetric() {
 				labels := make(map[string]string)
 				for _, label := range sample.GetLabel() {
@@ -119,6 +162,7 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 	cfg.AuthStyle = oauth2.AuthStyleInHeader // One request even when this test's token endpoint rejects credentials.
 	client := createClient(cred, cfg)
 	before := gather()
+	wantDurationCounts := durationCounts(t)
 
 	account, _, err := client.AccountsServiceClient.GlobalAccountOperationsAPI.GetGlobalAccount(t.Context()).Execute()
 	require.NoError(t, err)
@@ -126,12 +170,15 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 	_, _, err = client.ProvisioningServiceClient.GetAvailableEnvironments(t.Context()).Authorization("unused-sdk-header").Execute()
 	require.NoError(t, err)
 	require.Equal(t, before, gather(), "OAuth and other clients must not count, even on a matching GET")
+	require.Equal(t, wantDurationCounts, durationCounts(t), "OAuth and other clients must not record latency")
 
 	_, _, err = client.EntitlementsServiceClient.GetDirectoryAssignments(t.Context()).ServiceName("test").PlanName("plan").Execute()
 	require.NoError(t, err)
 	expected := maps.Clone(before)
 	expected[sampleKey{"get_directory_assignments", "2xx"}]++
 	require.Equal(t, expected, gather())
+	wantDurationCounts["get_directory_assignments"]++
+	require.Equal(t, wantDurationCounts, durationCounts(t))
 	payload := entclient.NewSubaccountServicePlansRequestPayloadCollection([]entclient.ServicePlanAssignmentRequestPayload{
 		*entclient.NewServicePlanAssignmentRequestPayload([]entclient.SubaccountServicePlanRequestPayload{
 			*entclient.NewSubaccountServicePlanRequestPayload("test-subaccount"),
@@ -144,6 +191,8 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 	expected[sampleKey{"set_service_plans", "2xx"}]++
 	require.Equal(t, expected, gather())
+	wantDurationCounts["set_service_plans"]++
+	require.Equal(t, wantDurationCounts, durationCounts(t))
 	wantRequests := []string{"POST /oauth/token", "GET " + globalAccount, "GET " + assignments, "GET " + environments, "GET " + assignments, "PUT " + servicePlans}
 	require.Equal(t, wantRequests, seen, "all three client families must reuse one OAuth token")
 
@@ -152,6 +201,7 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 	require.Nil(t, resp)
 	require.Equal(t, wantRequests, seen, "invalid payload must not send a request")
 	require.Equal(t, expected, gather())
+	require.Equal(t, wantDurationCounts, durationCounts(t))
 
 	failToken = true
 	fresh := createClient(cred, cfg)
@@ -162,6 +212,7 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 	require.Nil(t, resp)
 	require.Equal(t, append(wantRequests, "POST /oauth/token"), seen, "OAuth failure must not dispatch an Entitlements request")
 	require.Equal(t, expected, gather())
+	require.Equal(t, wantDurationCounts, durationCounts(t))
 
 	t.Run("preserves HTTP client policies", func(t *testing.T) {
 		jar, err := cookiejar.New(nil)
@@ -196,5 +247,97 @@ func TestClient_EntitlementsAttemptMetrics(t *testing.T) {
 		require.Equal(t, http.StatusFound, resp.StatusCode)
 		expected[sampleKey{"get_directory_assignments", "3xx"}]++
 		require.Equal(t, expected, gather())
+		wantDurationCounts["get_directory_assignments"]++
+		require.Equal(t, wantDurationCounts, durationCounts(t))
+	})
+
+	t.Run("typed nil debugger is not dereferenced during construction", func(t *testing.T) {
+		var debugger *RoundTripDebugger
+		oauth := &oauth2.Transport{Base: debugger}
+		shared := &http.Client{Transport: oauth}
+		require.NotNil(t, createEntitlementsServiceClient(cred, shared))
+		require.Same(t, oauth, shared.Transport)
+		require.Equal(t, debugger, oauth.Base)
+	})
+}
+
+type slowResponseBody struct {
+	io.Reader
+	started bool
+	closed  bool
+}
+
+func (b *slowResponseBody) Read(p []byte) (int, error) {
+	if !b.started {
+		b.started = true
+		time.Sleep(2 * time.Second)
+	}
+	return b.Reader.Read(p)
+}
+
+func (b *slowResponseBody) Close() error {
+	b.closed = true
+	return nil
+}
+
+type debuggerLogger struct {
+	logging.Logger
+	onDebug func()
+}
+
+func (l debuggerLogger) Debug(_ string, _ ...any) { l.onDebug() }
+
+func TestClient_EntitlementsDurationExcludesDebuggerBody(t *testing.T) {
+	// Changes the package logger; do not run in parallel.
+	synctest.Test(t, func(t *testing.T) {
+		reg := prometheus.NewRegistry()
+		require.NoError(t, entitlementmetrics.RegisterDuration(reg))
+		before := entitlementsDurationSnapshot(t, reg)
+		body := &slowResponseBody{Reader: strings.NewReader(`{"fetchErrorFromExternalProviderRegistry":true}`)}
+		calls, logs := 0, 0
+		original := log
+		SetLogger(debuggerLogger{Logger: logging.NewNopLogger(), onDebug: func() {
+			logs++
+			require.True(t, body.started, "debugger must read the original response body before logging")
+			require.True(t, body.closed, "debugger must finish draining the original body before logging")
+		}})
+		t.Cleanup(func() { SetLogger(original) })
+
+		base := attemptRoundTripper(func(req *http.Request) (*http.Response, error) {
+			calls++
+			require.Equal(t, "/entitlements/v1/assignments", req.URL.EscapedPath())
+			require.Equal(t, "Bearer test-access-token", req.Header.Get("Authorization"))
+			time.Sleep(125 * time.Millisecond)
+			resp := attemptResponse(req, http.StatusOK, "")
+			resp.Body = body
+			return resp, nil
+		})
+		debugger := &RoundTripDebugger{base: &base}
+		source := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-access-token"})
+		oauth := &oauth2.Transport{Source: source, Base: debugger}
+		shared := &http.Client{Transport: oauth}
+		cred := &Credentials{CISCredential: &CISCredential{}}
+		cred.CISCredential.Endpoints.EntitlementsServiceUrl = "https://cis.example"
+		client := createEntitlementsServiceClient(cred, shared)
+
+		start := time.Now()
+		assignments, _, err := client.GetDirectoryAssignments(t.Context()).Execute()
+		require.NoError(t, err)
+		require.True(t, assignments.GetFetchErrorFromExternalProviderRegistry(), "SDK must decode the body after the debugger drains it")
+		require.Equal(t, 2125*time.Millisecond, time.Since(start))
+		require.Equal(t, 1, calls)
+		require.Equal(t, 1, logs)
+		require.Same(t, oauth, shared.Transport)
+		require.Same(t, debugger, oauth.Base)
+		require.Same(t, &base, debugger.base)
+		require.Equal(t, source, oauth.Source)
+
+		after := entitlementsDurationSnapshot(t, reg)
+		const get = "get_directory_assignments"
+		require.Equal(t, before[get].count+1, after[get].count)
+		require.InDelta(t, 0.125, after[get].sum-before[get].sum, 1e-9)
+		delete(before, get)
+		delete(after, get)
+		require.Equal(t, before, after, "no other operation should change")
 	})
 }
