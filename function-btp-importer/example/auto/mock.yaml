@@ -1,0 +1,28 @@
+---
+serviceInstances:
+  - name: my-service-instance
+    id: si-uuid-aaaa-1111
+    servicePlanId: plan-uuid-eeee-5555
+serviceBindings:
+  - name: my-service-binding
+    id: sb-uuid-bbbb-2222
+    serviceInstanceId: si-uuid-aaaa-1111
+  - name: managed-cloud-management-binding
+    id: cm-bind-uuid-0001
+    serviceInstanceId: si-uuid-ffff-6666
+servicePlans:
+  - id: plan-uuid-eeee-5555
+    name: standard
+    serviceOfferingId: off-uuid-gggg-7777
+serviceOfferings:
+  - id: off-uuid-gggg-7777
+    name: my-service
+subaccounts:
+  - guid: sa-uuid-cccc-3333
+    subdomain: my-subdomain
+    region: eu10
+environments:
+  - id: env-uuid-dddd-4444
+    name: my-kyma-env
+    environmentType: kyma
+    planName: aws

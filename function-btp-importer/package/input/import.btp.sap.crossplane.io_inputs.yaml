@@ -1,0 +1,121 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: inputs.import.btp.sap.crossplane.io
+spec:
+  group: import.btp.sap.crossplane.io
+  names:
+    categories:
+      - crossplane
+    kind: Input
+    listKind: InputList
+    plural: inputs
+    singular: input
+  scope: Namespaced
+  versions:
+    - name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: Input is the configuration for function-import-btp.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            exclude:
+              description: |-
+                Exclude is a list of RE2 regex patterns matched against the composition
+                resource name (the key in the desired map). Matching resources are skipped.
+              items:
+                type: string
+              type: array
+            include:
+              description: |-
+                Include is a list of RE2 regex patterns. When non-empty, only resources
+                whose composition resource name matches at least one pattern are considered.
+                Evaluated before Exclude.
+              items:
+                type: string
+              type: array
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            mode:
+              default: auto
+              description: |-
+                Mode controls lookup behavior. "auto" attempts import for all supported
+                resources without external-name. "explicit" only attempts import for
+                resources annotated with import.btp.sap.crossplane.io/lookup: "true".
+              enum:
+                - auto
+                - explicit
+              type: string
+            secretRef:
+              description: SecretRef configures how the function locates the CIS provider secret.
+              properties:
+                key:
+                  description: Key is the data key within the Secret that holds the CIS credentials JSON.
+                  type: string
+                name:
+                  description: Name resolves the Kubernetes Secret name.
+                  properties:
+                    fromContextKey:
+                      description: |-
+                        FromContextKey resolves the value from the Crossplane pipeline context
+                        at the given key. A prior function in the pipeline must have set this key.
+                      type: string
+                    fromFieldPath:
+                      description: |-
+                        FromFieldPath resolves the value from the observed composite resource
+                        at the given field path (e.g. "metadata.labels[crossplane.io/claim-namespace]").
+                      type: string
+                    value:
+                      description: Value is a static literal string.
+                      type: string
+                  type: object
+                  x-kubernetes-validations:
+                    - message: exactly one of value, fromFieldPath, or fromContextKey must be set
+                      rule: '[has(self.value), has(self.fromFieldPath), has(self.fromContextKey)].filter(x, x).size() == 1'
+                namespace:
+                  description: Namespace resolves the Kubernetes Secret namespace.
+                  properties:
+                    fromContextKey:
+                      description: |-
+                        FromContextKey resolves the value from the Crossplane pipeline context
+                        at the given key. A prior function in the pipeline must have set this key.
+                      type: string
+                    fromFieldPath:
+                      description: |-
+                        FromFieldPath resolves the value from the observed composite resource
+                        at the given field path (e.g. "metadata.labels[crossplane.io/claim-namespace]").
+                      type: string
+                    value:
+                      description: Value is a static literal string.
+                      type: string
+                  type: object
+                  x-kubernetes-validations:
+                    - message: exactly one of value, fromFieldPath, or fromContextKey must be set
+                      rule: '[has(self.value), has(self.fromFieldPath), has(self.fromContextKey)].filter(x, x).size() == 1'
+              required:
+                - key
+                - name
+                - namespace
+              type: object
+          required:
+            - secretRef
+          type: object
+      served: true
+      storage: true
