@@ -9,11 +9,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/httpcount"
+	attemptmetrics "github.com/sap/crossplane-provider-btp/internal/metrics/entitlements"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 )
 
@@ -42,6 +44,11 @@ const (
 // server (test-cleanable via t.Cleanup).
 func buildEntitlementsClient(t *testing.T, handler http.HandlerFunc) (EntitlementsClient, *httpcount.RoundTripper, *httptest.Server) {
 	t.Helper()
+	return buildEntitlementsClientWithTransport(t, handler, nil)
+}
+
+func buildEntitlementsClientWithTransport(t *testing.T, handler http.HandlerFunc, wrap func(http.RoundTripper) http.RoundTripper) (EntitlementsClient, *httpcount.RoundTripper, *httptest.Server) {
+	t.Helper()
 
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
@@ -49,6 +56,9 @@ func buildEntitlementsClient(t *testing.T, handler http.HandlerFunc) (Entitlemen
 	rt := httpcount.New(nil)
 	cfg := entclient.NewConfiguration()
 	cfg.HTTPClient = rt.Client()
+	if wrap != nil {
+		cfg.HTTPClient.Transport = wrap(rt)
+	}
 	cfg.Servers = []entclient.ServerConfiguration{{URL: srv.URL}}
 	api := entclient.NewAPIClient(cfg).ManageAssignedEntitlementsAPI
 
@@ -134,6 +144,60 @@ func TestDescribeInstance_CachedWithinTTL(t *testing.T) {
 	r.Equal(uint64(1), got, "TTL cache must collapse %d sequential describes to 1 GET; got %d", calls, got)
 	r.Equal(1, fires, "server handler must fire once too")
 	r.Equal(uint64(1), rt.Total(), "no other endpoints should have been hit")
+}
+
+func TestDescribeInstance_AttemptMetrics(t *testing.T) {
+	// Shares package-level describeCache; do not run in parallel.
+	clearDescribeCache()
+	t.Cleanup(clearDescribeCache)
+	reg := prometheus.NewRegistry()
+	require.NoError(t, attemptmetrics.Register(reg))
+	gather := func() (total, assignments2xx float64) {
+		families, err := reg.Gather()
+		require.NoError(t, err)
+		for _, family := range families {
+			require.Equal(t, "provider_btp_api_request_attempts_total", family.GetName())
+			for _, sample := range family.GetMetric() {
+				count := sample.GetCounter().GetValue()
+				total += count
+				labels := make(map[string]string)
+				for _, label := range sample.GetLabel() {
+					labels[label.GetName()] = label.GetValue()
+				}
+				if len(labels) == 3 && labels["service"] == "entitlements" && labels["operation"] == "get_directory_assignments" && labels["result"] == "2xx" {
+					assignments2xx += count
+				}
+			}
+		}
+		return total, assignments2xx
+	}
+	beforeTotal, before2xx := gather()
+
+	var fires int
+	var mu sync.Mutex
+	client, wire, _ := buildEntitlementsClientWithTransport(t, assignmentsHandler(&fires, &mu), func(base http.RoundTripper) http.RoundTripper {
+		return attemptmetrics.Wrap(base, "")
+	})
+	key, err := NewExternalNameKey(newTestCR(testService, testPlan, testSubaccount))
+	require.NoError(t, err)
+	assertCounts := func(want uint64) {
+		t.Helper()
+		require.Equal(t, want, wire.CountFor(http.MethodGet, "/entitlements/v1/assignments"))
+		require.Equal(t, want, wire.Total())
+		total, assignments2xx := gather()
+		require.Equal(t, float64(want), total-beforeTotal)
+		require.Equal(t, float64(want), assignments2xx-before2xx)
+	}
+
+	_, err = client.DescribeInstance(t.Context(), key)
+	require.NoError(t, err)
+	assertCounts(1)
+	_, err = client.DescribeInstance(t.Context(), key)
+	require.NoError(t, err)
+	assertCounts(1)
+	_, err = client.DescribeInstanceFresh(t.Context(), key)
+	require.NoError(t, err)
+	assertCounts(2)
 }
 
 // TestDescribeInstance_SingleflightConcurrent — 32 goroutines all firing
