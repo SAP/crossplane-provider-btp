@@ -34,13 +34,23 @@ jobs:
       # hardcoded BTP CLI version
       btp_cli_version: 2.116.3
     steps:
-      - name: Set TARGET_IMAGE_VERSION
+      - name: Validate upgrade versions
+        env:
+          SOURCE_INPUT: ${{ github.event.inputs.source }}
+          TARGET_INPUT: ${{ github.event.inputs.target }}
         run: |
-          if [ -z "${{ github.event.inputs.target }}" ]; then
-            echo "TARGET_IMAGE_VERSION=local" >> $GITHUB_ENV
-          else
-            echo "TARGET_IMAGE_VERSION=${{ github.event.inputs.target }}" >> $GITHUB_ENV
+          export LC_ALL=C
+          version_pattern='^(v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?|local)$'
+          TARGET_INPUT=${TARGET_INPUT:-local}
+          if [[ ! "$SOURCE_INPUT" =~ $version_pattern ]]; then
+            echo "Error: source must be a version such as v1.2.3 or 'local'" >&2
+            exit 1
           fi
+          if [[ ! "$TARGET_INPUT" =~ $version_pattern ]]; then
+            echo "Error: target must be a version such as v1.2.3 or 'local'" >&2
+            exit 1
+          fi
+          printf 'SOURCE_IMAGE_VERSION=%s\nTARGET_IMAGE_VERSION=%s\n' "$SOURCE_INPUT" "$TARGET_INPUT" >> "$GITHUB_ENV"
 
       - name: Print TARGET_IMAGE_VERSION
         run: |
@@ -49,8 +59,6 @@ jobs:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
-          ref: ${{ inputs.checkout-ref }}
           submodules: true
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -91,7 +99,7 @@ jobs:
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
           IDP_URL: ${{ secrets.IDP_URL }} # Primary IDP: SECOND_IDP_URL is not a registered IAS host, so subaccount trust config creation 404s against it
-          UPGRADE_TEST_FROM_TAG: ${{ github.event.inputs.source }}
+          UPGRADE_TEST_FROM_TAG: ${{ env.SOURCE_IMAGE_VERSION }}
           UPGRADE_TEST_TO_TAG: ${{ env.TARGET_IMAGE_VERSION }}
 
       - name: clean up cluster
