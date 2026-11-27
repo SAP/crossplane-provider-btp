@@ -1,0 +1,84 @@
+name: Investigate docker save bug
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  investigate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Runner / Docker info
+        run: |
+          uname -a
+          docker info | grep -E "Storage Driver|driver-type|Server Version"
+
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Clone xp-testing at pinned version and add instrumentation
+        run: |
+          git clone --depth 1 --branch v1.10.2 https://github.com/crossplane-contrib/xp-testing.git /tmp/xp-testing
+
+          F=/tmp/xp-testing/internal/xpkg/xpkg.go
+
+          sed -i 's|image, err := daemon.Image(reference)|fmt.Fprintf(os.Stderr, "[xpkg-debug] calling daemon.Image() for %s\\n", imageName)\n\timage, err := daemon.Image(reference)|' "$F"
+          sed -i 's|_, err = image.Size()|sz, err := image.Size()\n\tfmt.Fprintf(os.Stderr, "[xpkg-debug] daemon.Image() OK, Size()=%d err=%v\\n", sz, err)|' "$F"
+          sed -i 's|return errors.Wrapf(err, errFmtNoPackageFileFound, read)|fmt.Fprintf(os.Stderr, "[xpkg-debug] tar.Next() FAILED after %d entries: %v\\n", read, err)\n\t\t\treturn errors.Wrapf(err, errFmtNoPackageFileFound, read)|' "$F"
+          sed -i 's|if h.Name == packageFile {|if h.Name == packageFile {\n\t\t\tfmt.Fprintf(os.Stderr, "[xpkg-debug] found package.yaml after %d entries\\n", read)|' "$F"
+
+          echo "--- patched xpkg.go ---"
+          grep -n "xpkg-debug\|daemon.Image\|sz," "$F"
+
+      - name: Wire replace directive in go.mod
+        run: |
+          go mod edit -replace github.com/crossplane-contrib/xp-testing=/tmp/xp-testing
+          go mod tidy
+
+      # Replicate the real upgrade test's make target:
+      # 1. docker build + xpkg build + docker load of local xpkg (make local-build)
+      # 2. docker pull FROM_TAG happens INSIDE go test (mustPullImage) — NOT before
+      # 3. kind cluster + crossplane + daemon.Image() (setupClusterWithCrossplane)
+      #
+      # Key finding: real failing runs never pre-pull v2.3.1 before go test.
+      # The prior investigate runs did a pre-pull step which masked the bug:
+      # mustPullImage inside go test became a cached no-op instead of a cold pull.
+
+      - name: "[1] make local-build (loads xpkg into daemon, no v2.3.1 yet)"
+        run: |
+          make local-build BUILD_ID=investigate-0
+          docker images | grep provider-btp
+          echo "--- v2.3.1 NOT in daemon yet (cold pull will happen inside go test) ---"
+          docker images | grep v2.3.1 || echo "confirmed: v2.3.1 absent"
+          # Compute BUILD_REGISTRY exactly as the Makefile does: sha256sum(HOSTNAME-pwd)[:8]
+          BUILD_REGISTRY="index.docker.io/build-$(echo "${HOSTNAME}-$(pwd)" | sha256sum | cut -c1-8)"
+          echo "UUT_XPKG=${BUILD_REGISTRY}/provider-btp-xpkg:latest" >> $GITHUB_ENV
+          echo "UUT_IMAGES={\"crossplane/provider-btp\":\"${BUILD_REGISTRY}/provider-btp-xpkg:latest\"}" >> $GITHUB_ENV
+
+      - name: "[2] Run upgrade test — first docker pull of v2.3.1 happens here (cold pull into populated store)"
+        run: |
+          go test -v -tags=upgrade -run Test_BaselineUpgradeProvider -timeout 10m ./test/upgrade/... 2>&1 || true
+        env:
+          UPGRADE_TEST_FROM_TAG: v2.3.1
+          UPGRADE_TEST_TO_TAG: local
+          UUT_XPKG: ${{ env.UUT_XPKG }}
+          UUT_IMAGES: ${{ env.UUT_IMAGES }}
+          CIS_CENTRAL_BINDING: '{"dummy":"true"}'
+          BTP_TECHNICAL_USER: '{"dummy":"true"}'
+          GLOBAL_ACCOUNT: dummy-global-account
+          CLI_SERVER_URL: https://dummy.example.com
+          BUILD_ID: investigate-0
