@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # This script injects the provider's controller options (error backoff rate
-# limiter, poll interval hook and poll-reset connector wrapper) into upjet
-# based controllers. Since the controller generation is part of upjet we can't
-# do that while generating, so we amend this code afterwards.
+# limiter, poll interval hook, adaptive poll reset and external-operation
+# metrics) into Upjet controllers without copying the upstream template.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -14,17 +13,18 @@ find "${CONTROLLER_ROOT}" -name "zz_controller.go" -print0 | xargs -0 perl -i -0
   's/o tjcontroller\.Options/o internalopts.UpjetOptions/g;
    s/o\.ForControllerRuntime\(\)/o.ForControllerRuntimeWithBackoff()/g;
    s/\tif o\.PollJitter != 0 \{\n\t\topts = append\(opts, managed\.WithPollJitterHook\(o\.PollJitter\)\)\n\t\}\n/\topts = append(opts, o.PollReconcilerOptions()...)\n/g;
-   s/managed\.WithExternalConnecter\(/o.WithExternalConnector(/g;
+   my ($gvk) = /name := managed\.ControllerName\((\w+\.\w+_GroupVersionKind)\.String\(\)\)/;
+   s/managed\.WithExternalConnecter\(/o.WithExternalConnector($gvk.Kind,/g if defined $gvk;
    s/(ctrl "sigs\.k8s\.io\/controller-runtime")/$1\n\tinternalopts "github.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/ unless /internalopts "github\.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/;'
 
 # Fail if an upjet change made a substitution above stop matching; otherwise
-# upjet controllers would silently lose the injected poll settings.
+# Upjet controllers would silently lose the injected poll settings or metrics.
 # `|| true`: GNU grep >= 3.5 exits 1 from -L when it lists no file, which
 # would trip `set -e` in the success case.
 missing="$(
   {
     find "${CONTROLLER_ROOT}" -name "zz_controller.go" -exec grep -L 'o.PollReconcilerOptions()' {} + || true
-    find "${CONTROLLER_ROOT}" -name "zz_controller.go" -exec grep -L 'o.WithExternalConnector(' {} + || true
+    find "${CONTROLLER_ROOT}" -name "zz_controller.go" -exec grep -EL 'o\.WithExternalConnector\([[:alnum:]_]+\.[[:alnum:]_]+_GroupVersionKind\.Kind,' {} + || true
   } | sort -u
 )"
 if [ -n "${missing}" ]; then

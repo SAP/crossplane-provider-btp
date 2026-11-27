@@ -8,6 +8,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/internal/controller/pollinterval"
+	"github.com/sap/crossplane-provider-btp/internal/metrics/externaloperation"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -26,6 +27,7 @@ var _ RuntimeOptionsGenerator = CrossplaneOptions{}
 type CrossplaneOptions struct {
 	xpcontroller.Options
 
+	ExternalOperations   *externaloperation.Recorder
 	BackoffBase          time.Duration
 	BackoffMax           time.Duration
 	ReconcileTimeout     time.Duration
@@ -50,6 +52,7 @@ var _ RuntimeOptionsGenerator = UpjetOptions{}
 type UpjetOptions struct {
 	tjcontroller.Options
 
+	ExternalOperations   *externaloperation.Recorder
 	BackoffBase          time.Duration
 	BackoffMax           time.Duration
 	PollJitterPercentage uint
@@ -77,14 +80,24 @@ func (co UpjetOptions) PollReconcilerOptions() []managed.ReconcilerOption {
 	return pollReconcilerOptions(co.pollConfig())
 }
 
-// WithExternalConnector installs c with the adaptive-poll reset on Update.
-func (co CrossplaneOptions) WithExternalConnector(c managed.ExternalConnector) managed.ReconcilerOption {
-	return withExternalConnector(co.pollConfig(), c)
+// WithExternalConnector installs c with the adaptive-poll reset on Update and
+// records calls at the managed boundary under the public Kubernetes kind.
+func (co CrossplaneOptions) WithExternalConnector(kind string, c managed.ExternalConnector) managed.ReconcilerOption {
+	c = withAdaptivePollReset(co.pollConfig(), c)
+	if co.ExternalOperations != nil {
+		c = co.ExternalOperations.Wrap(kind, c)
+	}
+	return managed.WithExternalConnector(c)
 }
 
-// WithExternalConnector installs c with the adaptive-poll reset on Update.
-func (co UpjetOptions) WithExternalConnector(c managed.ExternalConnector) managed.ReconcilerOption {
-	return withExternalConnector(co.pollConfig(), c)
+// WithExternalConnector installs c with the adaptive-poll reset on Update and
+// records calls at the managed boundary under the public Kubernetes kind.
+func (co UpjetOptions) WithExternalConnector(kind string, c managed.ExternalConnector) managed.ReconcilerOption {
+	c = withAdaptivePollReset(co.pollConfig(), c)
+	if co.ExternalOperations != nil {
+		c = co.ExternalOperations.Wrap(kind, c)
+	}
+	return managed.WithExternalConnector(c)
 }
 
 func (co CrossplaneOptions) pollConfig() pollinterval.Config {
@@ -116,11 +129,11 @@ func pollReconcilerOptions(c pollinterval.Config) []managed.ReconcilerOption {
 	}
 }
 
-// withExternalConnector adds the poll reset only when adaptive polling is
+// withAdaptivePollReset adds the poll reset only when adaptive polling is
 // enabled, so default flags leave Synced timestamps exactly as before.
-func withExternalConnector(c pollinterval.Config, ec managed.ExternalConnector) managed.ReconcilerOption {
+func withAdaptivePollReset(c pollinterval.Config, ec managed.ExternalConnector) managed.ExternalConnector {
 	if c.AdaptivePollEnabled() {
-		ec = pollinterval.WithPollResetOnUpdate(ec)
+		return pollinterval.WithPollResetOnUpdate(ec)
 	}
-	return managed.WithExternalConnector(ec)
+	return ec
 }

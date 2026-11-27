@@ -67,7 +67,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.SubaccountTrustConfiguration_GroupVersionKind)))
 	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.SubaccountTrustConfiguration_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler), tjcontroller.WithStatusUpdates(false))
 	opts := []managed.ReconcilerOption{
-		o.WithExternalConnector(
+		o.WithExternalConnector(v1alpha1.SubaccountTrustConfiguration_GroupVersionKind.Kind,
 			tjcontroller.NewTerraformPluginFrameworkAsyncConnector(mgr.GetClient(), o.OperationTrackerStore, o.SetupFn, o.Provider.Resources["btp_subaccount_trust_configuration"],
 				tjcontroller.WithTerraformPluginFrameworkAsyncLogger(o.Logger),
 				tjcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),

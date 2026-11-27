@@ -13,6 +13,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
+	"github.com/prometheus/client_golang/prometheus"
+	controllertest "github.com/sap/crossplane-provider-btp/internal/controller/test"
+	"github.com/sap/crossplane-provider-btp/internal/metrics/externaloperation"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +51,7 @@ func newPollReconciler(ann string, setup func(*fake.LegacyManaged), onStatus fun
 				}
 				return nil
 			},
+			MockUpdate: test.NewMockUpdateFn(nil),
 			MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil, func(obj client.Object) error {
 				if onStatus != nil {
 					onStatus(obj)
@@ -92,24 +97,32 @@ func stableSince(ago time.Duration) func(*fake.LegacyManaged) {
 	}
 }
 
-type optionsStruct interface {
-	PollReconcilerOptions() []managed.ReconcilerOption
-	WithExternalConnector(managed.ExternalConnector) managed.ReconcilerOption
+type optionsStruct struct {
+	pollReconcilerOptions func() []managed.ReconcilerOption
+	withExternalConnector func(managed.ExternalConnector) managed.ReconcilerOption
 }
 
 // optionStructs builds both option structs with --poll=1m.
-var optionStructs = map[string]func(pct uint, pollMax, pollMaxAfter time.Duration) optionsStruct{
-	"CrossplaneOptions": func(pct uint, pollMax, pollMaxAfter time.Duration) optionsStruct {
-		return CrossplaneOptions{
+var optionStructs = map[string]func(pct uint, pollMax, pollMaxAfter time.Duration, recorder *externaloperation.Recorder) optionsStruct{
+	"CrossplaneOptions": func(pct uint, pollMax, pollMaxAfter time.Duration, recorder *externaloperation.Recorder) optionsStruct {
+		o := CrossplaneOptions{
 			Options:              xpcontroller.Options{PollInterval: time.Minute},
+			ExternalOperations:   recorder,
 			PollJitterPercentage: pct, PollMax: pollMax, PollMaxAfter: pollMaxAfter,
 		}
+		return optionsStruct{o.PollReconcilerOptions, func(c managed.ExternalConnector) managed.ReconcilerOption {
+			return o.WithExternalConnector("Directory", c)
+		}}
 	},
-	"UpjetOptions": func(pct uint, pollMax, pollMaxAfter time.Duration) optionsStruct {
-		return UpjetOptions{
+	"UpjetOptions": func(pct uint, pollMax, pollMaxAfter time.Duration, recorder *externaloperation.Recorder) optionsStruct {
+		o := UpjetOptions{
 			Options:              tjcontroller.Options{Options: xpcontroller.Options{PollInterval: time.Minute}},
+			ExternalOperations:   recorder,
 			PollJitterPercentage: pct, PollMax: pollMax, PollMaxAfter: pollMaxAfter,
 		}
+		return optionsStruct{o.PollReconcilerOptions, func(c managed.ExternalConnector) managed.ReconcilerOption {
+			return o.WithExternalConnector("Directory", c)
+		}}
 	},
 }
 
@@ -133,8 +146,8 @@ func TestPollReconcilerOptions(t *testing.T) {
 	for sname, build := range optionStructs {
 		for name, tc := range cases {
 			t.Run(sname+"/"+name, func(t *testing.T) {
-				o := build(tc.pct, tc.pollMax, 30*time.Minute)
-				r := newPollReconciler(tc.ann, tc.setup, nil, o.PollReconcilerOptions())
+				o := build(tc.pct, tc.pollMax, 30*time.Minute, nil)
+				r := newPollReconciler(tc.ann, tc.setup, nil, o.pollReconcilerOptions())
 				lo := tc.base * time.Duration(100-tc.pct) / 100
 				hi := tc.base * time.Duration(100+tc.pct) / 100
 				seen := map[time.Duration]bool{}
@@ -176,10 +189,13 @@ func TestWithExternalConnectorPollReset(t *testing.T) {
 	for sname, build := range optionStructs {
 		for name, tc := range cases {
 			t.Run(sname+"/"+name, func(t *testing.T) {
-				o := build(0, tc.pollMax, 30*time.Minute)
+				reg := prometheus.NewRegistry()
+				recorder, err := externaloperation.NewRecorder(reg)
+				require.NoError(t, err)
+				o := build(0, tc.pollMax, 30*time.Minute, recorder)
 				var got xpv2.Condition
 				onStatus := func(obj client.Object) { got = obj.(*fake.LegacyManaged).GetCondition(xpv2.TypeSynced) }
-				extra := append(o.PollReconcilerOptions(), o.WithExternalConnector(externalConnector(false)))
+				extra := append(o.pollReconcilerOptions(), o.withExternalConnector(externalConnector(false)))
 				r := newPollReconciler("", stableSince(time.Hour), onStatus, extra)
 
 				start := time.Now().Add(-time.Second)
@@ -192,7 +208,52 @@ func TestWithExternalConnectorPollReset(t *testing.T) {
 				if refreshed := got.LastTransitionTime.After(start); refreshed != tc.refreshed {
 					t.Errorf("Synced LTT = %v; refreshed = %v, want %v", got.LastTransitionTime, refreshed, tc.refreshed)
 				}
+				controllertest.RequireExternalOperations(t, reg,
+					controllertest.ExternalOperation{Kind: "Directory", Operation: "connect", Outcome: "success"},
+					controllertest.ExternalOperation{Kind: "Directory", Operation: "observe", Outcome: "success"},
+					controllertest.ExternalOperation{Kind: "Directory", Operation: "update", Outcome: "success"},
+				)
 			})
 		}
+	}
+}
+
+func TestCrossplaneExternalConnectorCreateAndDeleteMetrics(t *testing.T) {
+	for _, operation := range []string{"create", "delete"} {
+		t.Run(operation, func(t *testing.T) {
+			deleting := operation == "delete"
+			reg := prometheus.NewRegistry()
+			recorder, err := externaloperation.NewRecorder(reg)
+			require.NoError(t, err)
+			o := CrossplaneOptions{ExternalOperations: recorder}
+			setup := func(mg *fake.LegacyManaged) {
+				if deleting {
+					now := metav1.Now()
+					mg.SetDeletionTimestamp(&now)
+				}
+			}
+			c := managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
+				return &managed.ExternalClientFns{
+					ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: deleting}, nil
+					},
+					CreateFn: func(context.Context, resource.Managed) (managed.ExternalCreation, error) {
+						return managed.ExternalCreation{}, nil
+					},
+					DeleteFn: func(context.Context, resource.Managed) (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, nil
+					},
+					DisconnectFn: func(context.Context) error { return nil },
+				}, nil
+			})
+			r := newPollReconciler("", setup, nil, []managed.ReconcilerOption{o.WithExternalConnector("Directory", c)})
+			_, err = r.Reconcile(t.Context(), reconcile.Request{})
+			require.NoError(t, err)
+			controllertest.RequireExternalOperations(t, reg,
+				controllertest.ExternalOperation{Kind: "Directory", Operation: "connect", Outcome: "success"},
+				controllertest.ExternalOperation{Kind: "Directory", Operation: "observe", Outcome: "success"},
+				controllertest.ExternalOperation{Kind: "Directory", Operation: operation, Outcome: "success"},
+			)
+		})
 	}
 }
